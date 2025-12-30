@@ -1,0 +1,5 @@
+9M-M67,Boeing,737,227,Scheduled
+9M-185,Airbus,Yee,200,Scheduled
+9M-cdsca,csdcsc,dscc,566,Available
+9M-FV7,Boeing,737-300,200,Available
+9M-N12345,Boeing,737-800,190,Available
