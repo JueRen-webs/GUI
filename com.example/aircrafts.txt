@@ -1,3 +1,0 @@
-N12345,Boeing,737-800,190,Scheduled
-cdsca,csdcsc,dscc,566,Scheduled
-9M-185,Airbus,Yee,200,Scheduled
