@@ -610,10 +610,29 @@ public class App extends Application {
 
         btnAdd.setOnAction(e -> { showAddFlightDialog(); showFlightView(); });
         
+     // [核心修改]: 更新状态按钮的逻辑
         btnStatus.setOnAction(e -> {
             Flight selected = table.getSelectionModel().getSelectedItem();
-            if (selected != null) { showUpdateStatusDialog(selected); table.refresh(); }
-            else showAlert("Select Flight", "Please select a flight first.");
+            if (selected != null) {
+                // 1. 获取当前状态
+                String currentStatus = selected.getStatus();
+                
+                // 2. 检查是否为终结状态 (Arrived 或 Cancelled)
+                if ("Arrived".equalsIgnoreCase(currentStatus) || "Cancelled".equalsIgnoreCase(currentStatus)) {
+                    // 如果是，弹窗警告并阻止操作
+                    showAlert("Action Denied", 
+                        "Flight " + selected.getFlightNumber() + " is already " + currentStatus + ".\n" +
+                        "No further changes are allowed for completed or cancelled flights.");
+                    return; // 直接结束，不弹出更新对话框
+                }
+
+                // 3. 如果不是终结状态，才允许更新
+                showUpdateStatusDialog(selected); 
+                table.refresh(); 
+            }
+            else {
+                showAlert("Select Flight", "Please select a flight first.");
+            }
         });
 
         btnCancel.setOnAction(e -> {
