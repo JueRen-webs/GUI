@@ -542,7 +542,7 @@ public class App extends Application {
         centerContent.getChildren().addAll(header, statsBox, tableHeaderBox, statusTable); 
     }
     
-    // ================== 2. 飞机管理视图 (UI 升级版) ==================
+    // ================== 2. 飞机管理视图 (UI 升级版 + 排期查看功能) ==================
     private void showAircraftView() {
         centerContent.getChildren().clear();
         
@@ -563,24 +563,24 @@ public class App extends Application {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         VBox.setVgrow(table, Priority.ALWAYS);
 
-        // --- 列定义 ---
-        TableColumn<Aircraft, String> colReg = new TableColumn<>();
+        // --- 原有列定义 ---
+        TableColumn<Aircraft, String> colReg = new TableColumn<>("Reg No.");
         colReg.setCellValueFactory(new PropertyValueFactory<>("registrationNumber"));
         setupColumnFilter(colReg, "Reg No.", filteredData, masterData, activeFilters, Aircraft::getRegistrationNumber);
 
-        TableColumn<Aircraft, String> colBrand = new TableColumn<>();
+        TableColumn<Aircraft, String> colBrand = new TableColumn<>("Brand");
         colBrand.setCellValueFactory(new PropertyValueFactory<>("brand"));
         setupColumnFilter(colBrand, "Brand", filteredData, masterData, activeFilters, Aircraft::getBrand);
 
-        TableColumn<Aircraft, String> colModel = new TableColumn<>();
+        TableColumn<Aircraft, String> colModel = new TableColumn<>("Model");
         colModel.setCellValueFactory(new PropertyValueFactory<>("model"));
         setupColumnFilter(colModel, "Model", filteredData, masterData, activeFilters, Aircraft::getModel);
 
-        TableColumn<Aircraft, Integer> colCap = new TableColumn<>();
+        TableColumn<Aircraft, Integer> colCap = new TableColumn<>("Capacity");
         colCap.setCellValueFactory(new PropertyValueFactory<>("capacity"));
         setupColumnFilter(colCap, "Capacity", filteredData, masterData, activeFilters, a -> String.valueOf(a.getCapacity()));
 
-        TableColumn<Aircraft, String> colStatus = new TableColumn<>();
+        TableColumn<Aircraft, String> colStatus = new TableColumn<>("Status");
         colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
         colStatus.setCellFactory(col -> new TableCell<Aircraft, String>() {
             @Override
@@ -588,16 +588,95 @@ public class App extends Application {
                 super.updateItem(item, empty);
                 if (item != null && !empty) {
                     setText(item);
-                    if ("Available".equalsIgnoreCase(item)) setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold;");
-                    else if ("Maintenance".equalsIgnoreCase(item)) setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
-                    else setStyle("-fx-text-fill: #2c3e50;");
+                    // 如果状态是 Available，显示绿色；Maintenance 显示红色；Scheduled 显示蓝色
+                    if ("Available".equalsIgnoreCase(item)) setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold; -fx-alignment: CENTER;");
+                    else if ("Maintenance".equalsIgnoreCase(item)) setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold; -fx-alignment: CENTER;");
+                    else setStyle("-fx-text-fill: #3498db; -fx-font-weight: bold; -fx-alignment: CENTER;"); // Scheduled or others
                 } else { setText(null); setStyle(""); }
             }
         });
         setupColumnFilter(colStatus, "Status", filteredData, masterData, activeFilters, Aircraft::getStatus);
 
-        table.getColumns().addAll(colReg, colBrand, colModel, colCap, colStatus);
+        // --- [新增] Schedule 查看列 ---
+        TableColumn<Aircraft, Aircraft> colSchedule = new TableColumn<>("Schedule");
+        // 使用 Aircraft 对象本身作为这一列的数据
+        colSchedule.setCellValueFactory(cell -> new javafx.beans.property.SimpleObjectProperty<>(cell.getValue()));
+        
+        colSchedule.setCellFactory(col -> new TableCell<Aircraft, Aircraft>() {
+            private final Button btn = new Button("Check");
 
+            {
+                // 设置按钮样式 (紫色，区别于其他按钮)
+                btn.getStyleClass().add("btn");
+                btn.setStyle("-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 4 12; -fx-background-radius: 15;");
+                
+                // 按钮点击事件：查找该飞机的排期
+                btn.setOnAction(e -> {
+                    Aircraft a = getItem();
+                    if (a != null) {
+                        // 1. 筛选出这架飞机 且 未结束 的航班 (Scheduled, Boarding, Departed...)
+                        List<Flight> plans = system.getAllFlights().stream()
+                            .filter(f -> f.getAircraft().getRegistrationNumber().equals(a.getRegistrationNumber()))
+                            .filter(f -> !"Arrived".equalsIgnoreCase(f.getStatus()) && !"Cancelled".equalsIgnoreCase(f.getStatus()))
+                            .sorted((f1, f2) -> f1.getDepartureTime().compareTo(f2.getDepartureTime())) // 按时间排序
+                            .collect(java.util.stream.Collectors.toList());
+                        
+                        // 2. 构建显示内容
+                        if (plans.isEmpty()) {
+                            showAlert("Schedule Info", "Aircraft " + a.getRegistrationNumber() + " is currently free (No future flights).");
+                        } else {
+                            StringBuilder sb = new StringBuilder();
+                            sb.append("Upcoming Flights for ").append(a.getRegistrationNumber()).append(":\n\n");
+                            
+                            for (Flight f : plans) {
+                                sb.append("✈ ").append(f.getFlightNumber())
+                                  .append(" | ").append(f.getDepartureTime().toLocalDate())
+                                  .append(" ").append(f.getDepartureTime().toLocalTime())
+                                  .append("\n    To: ").append(f.getDestination())
+                                  .append("  [").append(f.getStatus()).append("]\n")
+                                  .append("------------------------------------------------\n");
+                            }
+                            // 弹窗显示
+                            TextArea textArea = new TextArea(sb.toString());
+                            textArea.setEditable(false);
+                            textArea.setWrapText(true);
+                            textArea.setMaxWidth(Double.MAX_VALUE);
+                            textArea.setMaxHeight(Double.MAX_VALUE);
+
+                            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                            alert.setTitle("Aircraft Schedule");
+                            alert.setHeaderText("Schedule for " + a.getRegistrationNumber());
+                            alert.getDialogPane().setContent(textArea);
+                            alert.showAndWait();
+                        }
+                    }
+                });
+            }
+
+            @Override
+            protected void updateItem(Aircraft item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                } else {
+                    setGraphic(btn);
+                    setStyle("-fx-alignment: CENTER;");
+                }
+            }
+        });
+        
+        // 设置列宽
+        colReg.setMinWidth(100);
+        colBrand.setMinWidth(100);
+        colModel.setMinWidth(100);
+        colCap.setMinWidth(80);
+        colStatus.setMinWidth(100);
+        colSchedule.setMinWidth(100); colSchedule.setMaxWidth(120);
+
+        // 将所有列加入表格
+        table.getColumns().addAll(colReg, colBrand, colModel, colCap, colStatus, colSchedule);
+
+        // --- 底部按钮 ---
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_RIGHT);
         actions.setPadding(new Insets(15, 0, 0, 0));

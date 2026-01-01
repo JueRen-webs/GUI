@@ -1,6 +1,6 @@
-MH-002,BATU PAHAT,MALAYISA,2026-01-02T18:00,2026-01-02T21:00,Cancelled,9M-888,NO,0.00,190,Weather Conditions: Heavy Rain / Thunderstorm
+MH-002,BATU PAHAT,MALAYISA,2026-01-02T19:00,2026-01-02T22:00,Cancelled,9M-888,NO,0.00,190,Weather Conditions: Heavy Rain / Thunderstorm
 MH-003,BATU PAHAT,MALAYSIA,2025-12-31T06:00,2025-12-31T08:00,Arrived,9M-888,NO,0.00,200,
-MH-004,BATU PAHAT,MALAYSIA,2026-01-02T18:00,2026-01-02T22:00,Arrived,9M-111,NO,0.00,199,Weather Conditions: Heavy Rain / Thunderstorm;Operational: Crew Rotation / Rest
+MH-004,BATU PAHAT,MALAYSIA,2026-01-02T20:00,2026-01-03T00:00,Arrived,9M-111,NO,0.00,199,Weather Conditions: Heavy Rain / Thunderstorm;Operational: Crew Rotation / Rest
 MH-000,BATU PAHAT,LOS ANGELAS,2025-12-31T12:00,2025-12-31T14:00,Scheduled,9M-111,NO,0.00,200,
-MH-001,BATU PAHAT,KLIA,2026-01-06T09:00,2026-01-06T15:00,Arrived,9M-888,NO,0.00,122,Operational: Crew Rotation / Rest;Operational: Refueling Delays;Technical / Aircraft: Hydraulic System Issue;Technical / Aircraft: Navigational System Error
+MH-001,BATU PAHAT,KLIA,2026-01-06T13:00,2026-01-06T19:00,Arrived,9M-888,NO,0.00,122,Operational: Crew Rotation / Rest;Operational: Refueling Delays;Technical / Aircraft: Hydraulic System Issue;Technical / Aircraft: Navigational System Error
 MH-111,BATU PAHAT,SKUDAI,2026-01-07T09:00,2026-01-07T11:00,Arrived,9M-111,YES,2000.00,0,
