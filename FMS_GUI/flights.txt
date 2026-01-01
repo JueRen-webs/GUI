@@ -1,0 +1,2 @@
+MH-001,BATU PAHAT,KLIA,2025-12-31T09:00,2025-12-31T15:00,Arrived,9M-888,NO,0.00,122,Operational: Crew Rotation / Rest;Operational: Refueling Delays;Technical / Aircraft: Hydraulic System Issue;Technical / Aircraft: Navigational System Error
+MH-111,BATU PAHAT,SKUDAI,2026-01-07T09:00,2026-01-07T11:00,Arrived,9M-111,YES,2000.00,0,
