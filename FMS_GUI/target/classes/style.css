@@ -1,0 +1,359 @@
+/* =========================================
+   1. 全局设置 (Global)
+   ========================================= */
+.root {
+    -fx-font-family: "Segoe UI", "Helvetica", "Arial", sans-serif;
+    -fx-font-size: 14px;
+    -fx-background-color: #ffffff; /* 浅灰背景，保护眼睛 */
+}
+
+/* =========================================
+   2. 左侧导航栏 (Sidebar)
+   ========================================= */
+.sidebar {
+    /*-fx-background-color: #2f539b; /* 深蓝灰背景 */
+    -fx-background-image:url("bg.jpg");
+    -fx-background-size: cover;
+    -fx-background-position: center center;
+    -fx-padding: 20px 0;
+}
+
+.sidebar-title {
+    -fx-font-family:"Arial";
+    -fx-text-fill: white;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 0 20 20;
+}
+
+/* 菜单按钮 */
+.menu-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 15px;
+    -fx-alignment: CENTER-LEFT;
+    -fx-padding: 12 20 12 20;
+    -fx-cursor: hand;
+    -fx-border-width: 0 0 0 4; /* 左边预留一个条 */
+    -fx-border-color: transparent;
+}
+
+.menu-btn:hover {
+    -fx-background-color: #34495e;
+    -fx-text-fill: white;
+    -fx-border-color: #87c2e9; /* 悬停时左边出现蓝条 */
+}
+
+.menu-btn:pressed {
+    -fx-background-color: #3498db;
+}
+
+/* =========================================
+   3. 内容区域 (Content)
+   ========================================= */
+.content-header {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2c3e50;
+    -fx-padding: 0 0 20 0;
+}
+
+/* =========================================
+   4. 按钮样式 (Buttons)
+   ========================================= */
+.btn {
+    -fx-padding: 8 15;
+    -fx-background-radius: 5;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 5, 0, 0, 2);
+}
+
+/* 蓝色 - 主要操作 (Add, Update) */
+.btn-primary {
+    -fx-background-color: #3498db;
+}
+.btn-primary:hover { -fx-background-color: #2980b9; }
+
+/* 红色 - 危险操作 (Delete, Cancel) */
+.btn-danger {
+    -fx-background-color: #e74c3c;
+}
+.btn-danger:hover { -fx-background-color: #c0392b; }
+
+/* 灰色 - 次要操作 */
+.btn-secondary {
+    -fx-background-color: #95a5a6;
+}
+
+/* =========================================
+   5. 表格样式 (TableView)
+   ========================================= */
+.table-view {
+    -fx-background-color: white;
+    -fx-table-cell-border-color: transparent;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.05), 10, 0, 0, 5);
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #ecf0f1;
+    -fx-border-width: 0 0 1 0;
+    -fx-border-color: #bdc3c7;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #7f8c8d;
+    -fx-font-weight: bold;
+}
+
+.table-row-cell {
+    -fx-background-color: white;
+    -fx-border-width: 0 0 1 0;
+    -fx-border-color: #f0f0f0;
+}
+
+.table-row-cell:odd {
+    -fx-background-color: #fafafa; /* 斑马纹 */
+}
+
+.table-row-cell:selected {
+    -fx-background-color: #e8f6fe; /* 选中时变成浅蓝 */
+    -fx-text-background-color: black; /* 选中时字还是黑的 */
+}
+
+/* =========================================
+   6. 仪表盘卡片 (Dashboard Cards)
+   ========================================= */
+.card {
+    -fx-background-color: rgb(234, 246, 255);
+    -fx-background-radius: 8;
+    -fx-padding: 20;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 5);
+}
+
+.card-value {
+    -fx-font-size: 36px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2980b9;
+}
+
+.card-title {
+    -fx-font-size: 14px;
+    -fx-text-fill: #7f8c8d;
+}
+
+/* =========================================
+   8. 实时看板专用样式 (Live Board)
+   ========================================= */
+
+/* 1. 表格整体设置 */
+.live-board {
+    -fx-background-color: transparent; /* 背景透明，配合圆角 */
+    -fx-background-radius: 15px;       /* 表格整体圆角 */
+    -fx-border-radius: 15px;
+    -fx-border-color: transparent;
+    
+    /* 去掉讨厌的默认对焦蓝框 */
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    
+    /* 让表格内容稍微离开边框一点 */
+    -fx-padding: 0; 
+}
+
+/* 2. 表头样式 (Header) */
+.live-board .column-header-background {
+    -fx-background-color: #ecf0f1;      /* 浅灰底色 */
+    -fx-background-radius: 15px 15px 0 0; /* 🔥 关键：只圆上面两个角 */
+    -fx-border-width: 0 0 1 0;
+    -fx-border-color: #bdc3c7;
+}
+
+.live-board .column-header .label {
+    -fx-alignment: CENTER; /* 🔥 表头文字居中 */
+    -fx-font-weight: bold;
+    -fx-text-fill: #7f8c8d;
+    -fx-font-size: 14px;
+}
+
+/* 3. 行样式 (Rows) - 控制行高 */
+.live-board .table-row-cell {
+    -fx-cell-size: 30px;   /* 🔥 关键：每一行的高度改大 (原本是 24px) */
+    -fx-background-color: white;
+    -fx-border-width: 0 0 1 0;
+    -fx-border-color: #f5f6fa;
+}
+
+/* 4. 单元格样式 (Cells) - 控制文字 */
+.live-board .table-cell {
+    -fx-alignment: CENTER; /* 🔥 关键：所有单元格文字居中 */
+    -fx-font-size: 14px;
+    -fx-text-fill: #2c3e50;
+    -fx-border-color: transparent;
+}
+
+/* 5. 隐藏垂直滚动条的背景，看起来更干净 */
+.live-board .scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+}
+
+/* =========================================
+   9. 找回斑马纹 (Zebra Striping)
+   ========================================= */
+
+/* 单数行：浅灰色 */
+.live-board .table-row-cell:odd {
+    -fx-background-color: #f8f9fa;  /* 非常淡的灰，很舒服 */
+}
+
+/* 双数行：纯白色 */
+.live-board .table-row-cell:even {
+    -fx-background-color: white;
+}
+
+/* 鼠标悬停在某一行时：稍微变深一点，增加交互感 */
+.live-board .table-row-cell:hover {
+    -fx-background-color: #e8f6fe; /* 极淡的蓝色 */
+}
+
+/* 选中某一行时：保持深色高亮，不然看不出选中了谁 */
+.live-board .table-row-cell:selected {
+    -fx-background-color: #d1e7dd; /* 淡绿色背景 (配合你的看板风格) */
+    -fx-text-background-color: #0f5132; /* 选中后文字变深绿 */
+}
+
+/* =========================================
+   10. 强力隐藏排序图标 (Force Hide Sort Indicators)
+   ========================================= */
+
+/* 1. 隐藏排序小三角 (Arrow) */
+.table-view .column-header .arrow {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-shape: null; /* 移除三角形几何形状 */
+    -fx-pref-width: 0; /* 强制宽度为0 */
+    -fx-pref-height: 0; /* 强制高度为0 */
+    -fx-opacity: 0; /* 完全透明 */
+}
+
+/* 2. 隐藏排序顺序的数字或点 (Sort Order Dots/Numbers) */
+/* 我们同时选中所有可能的容器名称，确保覆盖不同版本的 JavaFX */
+.table-view .column-header .sort-order-dots,
+.table-view .column-header .sort-order-dots-container,
+.table-view .column-header .sort-order {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-max-width: 0; /* 确保不占空间 */
+    -fx-max-height: 0;
+    -fx-opacity: 0;
+}
+
+/* =========================================
+   [修改] 菜单选中状态 (Active State - 与 Hover 一致)
+   ========================================= */
+
+.menu-btn.active {
+    -fx-background-color: #34495e; /* 和悬停时一样的背景色 */
+    -fx-text-fill: white;          /* 白色文字 */
+    -fx-border-color: #87c2e9;     /* 和悬停时一样的左侧蓝条 */
+    -fx-font-weight: bold;         /* 唯一区别：文字加粗，表示“当前在这里” */
+}
+
+/* =========================================
+   11. 统计表 Total 行专用样式 (Closing Style)
+   ========================================= */
+
+/* 1. 针对 Total 行的整体样式 */
+.total-row {
+    -fx-background-color: #e6e6e6; /* 比普通行稍微深一点的灰色 */
+    -fx-border-color: #7f8c8d transparent transparent transparent; /* 顶部加深色边框 */
+    -fx-border-width: 2px 0 0 0;   /* 边框宽度：上2px，其他0 */
+    -fx-font-weight: bold;         /* 字体加粗 */
+    -fx-font-size: 15px;           /* 字体稍微大一点 */
+}
+
+/* 2. 确保 Total 行里的文字也是深色且加粗 */
+.total-row .table-cell {
+    -fx-text-fill: #2c3e50;
+    -fx-font-weight: bold;
+}
+
+/* ... (保留上面的所有代码，直接在最后添加下面的内容) ... */
+
+/* =========================================
+   12. 复选框样式 (Checkboxes) - 修复未选中时边框不明显的问题
+   ========================================= */
+
+/* 未选中状态：强制设置背景和边框 */
+.check-box .box {
+    -fx-background-color: white;
+    -fx-background-insets: 0;      /* 关键：清除默认的背景内边距，防止覆盖边框 */
+    -fx-border-color: #7f8c8d;     /* 深灰色边框 */
+    -fx-border-width: 1px;
+    -fx-border-radius: 3px;
+}
+
+/* 选中状态：背景变蓝 */
+.check-box:selected .box {
+    -fx-background-color: #3498db;
+    -fx-border-color: #3498db;
+}
+
+/* 选中状态：对勾颜色 */
+.check-box:selected .mark {
+    -fx-background-color: white;
+}
+
+/* =========================================
+   13. 筛选列表悬停样式 (Filter List Hover)
+   ========================================= */
+
+/* 1. 默认状态：复选框文字颜色 */
+.list-cell .check-box {
+    -fx-text-fill: #2c3e50;
+}
+
+/* 2. 悬停状态：复选框文字颜色变白 (配合 App.java 删除绑定代码后生效) */
+.list-cell:filled:hover .check-box {
+    -fx-text-fill: white;
+}
+
+/* 双重保险：强制内部文本节点也变白 */
+.list-cell:filled:hover .check-box .text {
+    -fx-fill: white;
+}
+
+/* ... (保留上面的所有代码，直接在最后添加下面的内容) ... */
+
+/* =========================================
+   14. 排序菜单项样式 (Sort Menu Items)
+   ========================================= */
+
+/* 1. 整个菜单的背景设为白色，去掉默认的灰色边框 */
+.context-menu {
+    -fx-background-color: white;
+    -fx-border-color: #bdc3c7;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 5, 0, 0, 2);
+}
+
+/* 2. 菜单项默认状态：文字深灰色 */
+.context-menu .menu-item .label {
+    -fx-text-fill: #2c3e50;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+/* 3. 菜单项悬停(Focused)状态：背景变蓝 */
+.context-menu .menu-item:focused {
+    -fx-background-color: #3498db;
+}
+
+/* 4. 菜单项悬停(Focused)状态：文字变白 */
+.context-menu .menu-item:focused .label {
+    -fx-text-fill: white;
+}
+/* style.css */
