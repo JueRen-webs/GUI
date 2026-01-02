@@ -29,6 +29,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.DatePicker;
+import javafx.scene.layout.GridPane;
+import javafx.util.Callback;
 
 // App 类继承 Application，这是 JavaFX 的标准写法
 public class App extends Application {
@@ -1463,130 +1467,119 @@ public class App extends Application {
         });
     }
     
-    // 弹出状态更新对话框 (包含高级分类 Delay 原因选择)
+    // 替换 App.java 中的这个方法
     private void showUpdateStatusDialog(Flight flight) {
-        ChoiceDialog<String> dialog = new ChoiceDialog<>(flight.getStatus(), 
-            "Boarding", "Departed", "Arrived", "Delayed", "Cancelled");
+        List<String> options = Arrays.asList("Boarding", "Departed", "Arrived", "Delayed", "Cancelled");
+        
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(flight.getStatus(), options);
         dialog.setTitle("Update Status");
         dialog.setHeaderText("Update status for " + flight.getFlightNumber());
-        dialog.setContentText("New Status:");
+        dialog.setContentText("Select New Status:");
 
         dialog.showAndWait().ifPresent(newStatus -> {
-            // 如果选的是 "Delayed"，弹出高级原因选择框
-            if ("Delayed".equals(newStatus)) {
-                
-                // --- 1. 创建自定义 Dialog ---
-                Dialog<String> delayDialog = new Dialog<>();
-                delayDialog.setTitle("Delay Details");
-                delayDialog.setHeaderText("Select Delay Category & Reason");
-                ButtonType okBtn = new ButtonType("Confirm", ButtonBar.ButtonData.OK_DONE);
-                delayDialog.getDialogPane().getButtonTypes().addAll(okBtn, ButtonType.CANCEL);
-
-                // --- 2. 定义分类数据 ---
-                Map<String, List<String>> delayMap = new LinkedHashMap<>(); 
-                
-                delayMap.put("Weather Conditions", Arrays.asList(
-                    "Heavy Rain / Thunderstorm", "Strong Crosswinds", "Low Visibility / Fog", "Snow / Ice", "Typhoon Warning"));
-                delayMap.put("Technical / Aircraft", Arrays.asList(
-                    "Engine Inspection", "Hydraulic System Issue", "Navigational System Error", "Door Seal Issue", "Landing Gear Check"));
-                delayMap.put("Operational", Arrays.asList(
-                    "Late Arrival of Incoming Aircraft", "Crew Rotation / Rest", "Catering Loading", "Baggage Handling", "Refueling Delays"));
-                delayMap.put("ATC / Airport", Arrays.asList(
-                    "Air Traffic Control Restriction", "Runway Maintenance", "Gate Availability", "Security Clearance"));
-                delayMap.put("Others", new ArrayList<>()); 
-
-                // --- 3. 创建界面控件 ---
-                GridPane grid = new GridPane();
-                grid.setHgap(10); grid.setVgap(10);
-                grid.setPadding(new Insets(20, 150, 10, 10));
-
-                ComboBox<String> categoryBox = new ComboBox<>();
-                categoryBox.setPromptText("Select Category...");
-                categoryBox.getItems().addAll(delayMap.keySet()); 
-
-                ComboBox<String> reasonBox = new ComboBox<>();
-                reasonBox.setPromptText("Select Specific Reason...");
-                reasonBox.setVisible(false);
-                reasonBox.setManaged(false); 
-
-                TextArea otherField = new TextArea();
-                otherField.setPromptText("Please type the specific reason here...");
-                otherField.setPrefHeight(60);
-                otherField.setPrefWidth(250);
-                otherField.setWrapText(true);
-                otherField.setVisible(false);
-                otherField.setManaged(false);
-
-                grid.add(new Label("Category:"), 0, 0);
-                grid.add(categoryBox, 1, 0);
-                grid.add(new Label("Reason:"), 0, 1);
-                
-                StackPane reasonContainer = new StackPane(reasonBox, otherField);
-                reasonContainer.setAlignment(Pos.CENTER_LEFT);
-                grid.add(reasonContainer, 1, 1);
-
-                delayDialog.getDialogPane().setContent(grid);
-
-                categoryBox.setOnAction(e -> {
-                    String selectedCat = categoryBox.getValue();
-                    if (selectedCat == null) return;
-
-                    if ("Others".equals(selectedCat)) {
-                        reasonBox.setVisible(false); reasonBox.setManaged(false);
-                        otherField.setVisible(true); otherField.setManaged(true);
-                        otherField.clear();
-                    } else {
-                        otherField.setVisible(false); otherField.setManaged(false);
-                        reasonBox.setVisible(true); reasonBox.setManaged(true);
-                        reasonBox.getItems().setAll(delayMap.get(selectedCat));
-                        reasonBox.getSelectionModel().clearSelection();
-                    }
-                    delayDialog.getDialogPane().getScene().getWindow().sizeToScene();
-                });
-
-                Button confirmButton = (Button) delayDialog.getDialogPane().lookupButton(okBtn);
-                confirmButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-                    String cat = categoryBox.getValue();
+            try {
+                // --- 1. 尝试起飞 ---
+                if ("Departed".equals(newStatus)) {
+                    if ("Departed".equals(flight.getStatus())) return; 
                     
-                    if (cat == null) {
-                        showAlert("Validation", "Please select a delay category.");
-                        event.consume(); return;
+                    // 系统会检查锁 + 自动刷新传播延误
+                    system.attemptDeparture(flight); 
+                    
+                    showAlert("Success", "Flight Departed.");
+                    // 刷新表格：如果这一班被传播延误了，时间会变；后面的航班时间也可能变
+                    showFlightView(); 
+
+                // --- 2. 尝试到达 ---
+                } else if ("Arrived".equals(newStatus)) {
+                    system.attemptArrival(flight);
+                    showAlert("Success", "Flight Arrived.");
+                    showFlightView();
+
+                // --- 3. 手动延误 (关键修改) ---
+                } else if ("Delayed".equals(newStatus)) {
+                    // 弹出原因选择 -> 用户确认 -> 调用 manualDelay
+                    showDelayReasonDialog(flight, (reason) -> {
+                         system.manualDelay(flight, reason);
+                         showAlert("Updated", "Delay recorded. Subsequent flights have been updated.");
+                         showFlightView(); // 刷新表格，你会立刻看到多米诺效应
+                    });
+
+                // --- 4. 其他状态 ---
+                } else {
+                    system.updateFlightStatus(flight.getFlightNumber(), newStatus);
+                    if ("Cancelled".equals(newStatus)) {
+                        // 取消也会释放资源，可能需要刷新排期 (防止之前的延误一直占着坑)
+                        flight.getAircraft().setStatus("Available");
+                        system.refreshScheduleForAircraft(flight.getAircraft().getRegistrationNumber());
                     }
+                    showFlightView();
+                }
 
-                    if ("Others".equals(cat)) {
-                        if (otherField.getText().trim().isEmpty()) {
-                            showAlert("Validation", "Please type the reason for 'Others'.");
-                            event.consume();
-                        }
-                    } else {
-                        if (reasonBox.getValue() == null) {
-                            showAlert("Validation", "Please select a specific reason.");
-                            event.consume();
-                        }
-                    }
-                });
+            } catch (Exception e) {
+                // 如果互斥锁拦截了，会显示在这里
+                showAlert("Action Blocked", e.getMessage());
+            }
+        });
+    }
 
-                delayDialog.setResultConverter(btn -> {
-                    if (btn == okBtn) {
-                        String cat = categoryBox.getValue();
-                        String detail;
-                        if ("Others".equals(cat)) {
-                            detail = "Others: " + otherField.getText().trim();
-                        } else {
-                            detail = cat + ": " + reasonBox.getValue();
-                        }
-                        return detail;
-                    }
-                    return null;
-                });
+    // 替换 App.java 中的这个方法 (增加了回调参数)
+    private void showDelayReasonDialog(Flight flight, java.util.function.Consumer<String> onConfirm) {
+        Dialog<String> delayDialog = new Dialog<>();
+        delayDialog.setTitle("Delay Details");
+        delayDialog.setHeaderText("Select Delay Category & Reason");
+        ButtonType okBtn = new ButtonType("Confirm", ButtonBar.ButtonData.OK_DONE);
+        delayDialog.getDialogPane().getButtonTypes().addAll(okBtn, ButtonType.CANCEL);
 
-                delayDialog.showAndWait().ifPresent(finalReason -> {
-                    system.updateFlightStatus(flight.getFlightNumber(), newStatus); 
-                    flight.addDelayReason(finalReason); 
-                });
+        Map<String, List<String>> delayMap = new LinkedHashMap<>(); 
+        delayMap.put("Weather Conditions", Arrays.asList("Heavy Rain", "Thunderstorm", "Fog"));
+        delayMap.put("Technical", Arrays.asList("Engine Issue", "Hydraulic Issue", "Door Sensor"));
+        delayMap.put("Operational", Arrays.asList("Late Incoming Aircraft", "Crew Timeout", "Cleaning"));
+        delayMap.put("Others", new ArrayList<>()); 
 
+        GridPane grid = new GridPane();
+        grid.setHgap(10); grid.setVgap(10); grid.setPadding(new Insets(20, 150, 10, 10));
+
+        ComboBox<String> categoryBox = new ComboBox<>();
+        categoryBox.getItems().addAll(delayMap.keySet());
+        categoryBox.setPromptText("Category");
+
+        ComboBox<String> reasonBox = new ComboBox<>();
+        reasonBox.setPromptText("Reason");
+        reasonBox.setVisible(false);
+
+        TextArea otherField = new TextArea();
+        otherField.setVisible(false); otherField.setPrefHeight(50);
+
+        grid.add(new Label("Category:"), 0, 0); grid.add(categoryBox, 1, 0);
+        grid.add(new Label("Reason:"), 0, 1);
+        StackPane container = new StackPane(reasonBox, otherField);
+        container.setAlignment(Pos.CENTER_LEFT);
+        grid.add(container, 1, 1);
+
+        delayDialog.getDialogPane().setContent(grid);
+
+        categoryBox.setOnAction(e -> {
+            String cat = categoryBox.getValue();
+            if ("Others".equals(cat)) {
+                reasonBox.setVisible(false); otherField.setVisible(true);
             } else {
-                system.updateFlightStatus(flight.getFlightNumber(), newStatus);
+                otherField.setVisible(false); reasonBox.setVisible(true);
+                reasonBox.getItems().setAll(delayMap.get(cat));
+            }
+        });
+
+        delayDialog.setResultConverter(btn -> {
+            if (btn == okBtn) {
+                String cat = categoryBox.getValue();
+                if ("Others".equals(cat)) return "Others: " + otherField.getText();
+                else return cat + ": " + reasonBox.getValue();
+            }
+            return null;
+        });
+
+        delayDialog.showAndWait().ifPresent(reason -> {
+            if (reason != null && !reason.isEmpty()) {
+                onConfirm.accept(reason); // 回调
             }
         });
     }

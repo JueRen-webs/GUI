@@ -1,20 +1,18 @@
 package fmsGUI;
 
-// 只导入用到的 IO 类
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-
-// 只导入用到的 Time 类
 import java.time.LocalDateTime;
-
-// 只导入用到的 Util 类 (注意 Scanner 在 util 包里)
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 public class FlightManagementSystem {
 
@@ -26,135 +24,178 @@ public class FlightManagementSystem {
         this.aircrafts = new HashMap<>();
     }
 
-    // --- 增删改查 (CRUD) ---
-    public void addFlight(Flight flight) { flights.put(flight.getFlightNumber(), flight); }
-    
-    // 修改后的删除航班方法：自动释放飞机
-    public void deleteFlight(String flightNumber) {
-        Flight f = flights.get(flightNumber); // 1. 先找到这个航班对象
-        if (f != null) {
-            // 2. 找到执行这个航班的飞机
-            Aircraft linkedAircraft = f.getAircraft();
-            
-            // 3. 如果飞机存在，把它的状态改回 "Available"
-            if (linkedAircraft != null) {
-                linkedAircraft.setStatus("Available");
-            }
-            
-            // 4. 最后才从系统里删除航班
-            flights.remove(flightNumber);
-        }
+    // --- 基础 CRUD ---
+    public void addFlight(Flight flight) { 
+        flights.put(flight.getFlightNumber(), flight); 
+        flight.getAircraft().setStatus("Scheduled"); // 有排班了，状态更新
     }
+    
+    public void deleteFlight(String flightNumber) {
+        Flight f = flights.get(flightNumber);
+        if (f != null && f.getAircraft() != null) {
+            // 删除后，如果飞机后面没事了，就设为 Available
+            if (!hasFutureFlights(f.getAircraft().getRegistrationNumber())) {
+                f.getAircraft().setStatus("Available");
+            }
+        }
+        flights.remove(flightNumber);
+    }
+    
     public Flight getFlight(String flightNumber) { return flights.get(flightNumber); }
     public List<Flight> getAllFlights() { return new ArrayList<>(flights.values()); }
-
-    public void updateFlightStatus(String flightNumber, String status) {
-        Flight f = flights.get(flightNumber);
-        if (f != null) {
-            // 1. 处理延误时间逻辑 (之前加的)
-            if ("Delayed".equalsIgnoreCase(status)) {
-                LocalDateTime currentArr = f.getArrivalTime();
-                f.setArrivalTime(currentArr.plusHours(1));
-            }
-            
-            // 2. [新增] 自动更新飞机状态逻辑
-            // 如果航班到了 (Arrived) 或者取消了 (Cancelled)，飞机就自由了 (Available)
-            if ("Arrived".equalsIgnoreCase(status) || "Cancelled".equalsIgnoreCase(status)) {
-                f.getAircraft().setStatus("Available");
-            } else {
-                // 如果状态是 Scheduled, Boarding, Departed, Delayed...
-                // 说明飞机还在忙，状态应该是 "Scheduled" (或者你可以叫 "In Use")
-                // 这一步是为了防止用户不小心点了 Arrived 后又改回来，飞机却没变回忙碌状态
-                f.getAircraft().setStatus("Scheduled");
-            }
-
-            // 3. 最后更新航班状态
-            f.setStatus(status);
-        }
-    }
-
     public void addAircraft(Aircraft aircraft) { aircrafts.put(aircraft.getRegistrationNumber(), aircraft); }
     public void deleteAircraft(String regNumber) { aircrafts.remove(regNumber); }
     public Aircraft getAircraft(String regNumber) { return aircrafts.get(regNumber); }
     public List<Aircraft> getAllAircrafts() { return new ArrayList<>(aircrafts.values()); }
 
-    // --- 冲突检查 ---
-    public boolean isAircraftAvailable(String regNo, LocalDateTime newDep, LocalDateTime newArr) {
+    // --- [辅助] 检查飞机未来是否还有任务 ---
+    private boolean hasFutureFlights(String regNo) {
+        return flights.values().stream()
+                .filter(f -> f.getAircraft().getRegistrationNumber().equals(regNo))
+                .anyMatch(f -> "Scheduled".equalsIgnoreCase(f.getStatus()) 
+                            || "Delayed".equalsIgnoreCase(f.getStatus())
+                            || "Boarding".equalsIgnoreCase(f.getStatus()));
+    }
+
+    // --- [核心逻辑 1] 互斥锁 ---
+    // 修复：只检查当前 "正在进行中" (Departed/In Flight) 的航班。
+    // Scheduled 的航班不应该锁死飞机。
+    public boolean checkAircraftPhysicalAvailability(String aircraftReg, String currentFlightId) {
         for (Flight f : flights.values()) {
-            if (f.getAircraft().getRegistrationNumber().equals(regNo)) {
-                if ("Cancelled".equalsIgnoreCase(f.getStatus())) continue;
-                if (f.getDepartureTime().isBefore(newArr) && f.getArrivalTime().isAfter(newDep)) {
-                    return false;
+            if (f.getFlightNumber().equals(currentFlightId)) continue; // 排除自己
+            
+            if (f.getAircraft().getRegistrationNumber().equals(aircraftReg)) {
+                String s = f.getStatus();
+                // 只有这些状态才表示飞机物理上被占用了
+                if ("Departed".equalsIgnoreCase(s) || "In Flight".equalsIgnoreCase(s) || "Boarding".equalsIgnoreCase(s)) {
+                    return false; 
                 }
             }
         }
-        return true;
+        return true; 
     }
 
-    // --- [核心修改]: 保存数据 (包含延误记录 + 乘客数量) ---
+    // --- [核心逻辑 2] 多米诺骨牌式排期刷新 ---
+    // 当某一班时间变动，自动把后面的航班往后推
+    public void refreshScheduleForAircraft(String regNo) {
+        // 1. 找出这架飞机的所有航班，按时间排序
+        List<Flight> sortedFlights = flights.values().stream()
+                .filter(f -> f.getAircraft().getRegistrationNumber().equals(regNo))
+                .sorted(Comparator.comparing(Flight::getDepartureTime))
+                .collect(Collectors.toList());
+
+        // 2. 遍历并处理冲突
+        for (int i = 0; i < sortedFlights.size() - 1; i++) {
+            Flight current = sortedFlights.get(i);
+            Flight next = sortedFlights.get(i+1);
+
+            // 如果 前一班到达时间 > 后一班计划起飞时间
+            if (current.getArrivalTime().isAfter(next.getDepartureTime())) {
+                
+                long diff = Duration.between(next.getDepartureTime(), current.getArrivalTime()).toMinutes();
+                
+                if (diff > 0) {
+                    // 防止重复添加相同的延误原因
+                    String reason = "Propagated Delay: Late arrival of " + current.getFlightNumber();
+                    boolean exists = next.getDelayReasons().stream().anyMatch(r -> r.startsWith(reason));
+                    
+                    if (!exists) {
+                        next.addPropagatedDelay(reason, diff);
+                    } else {
+                        // 如果原因已存在，但时间还需要调整，直接改时间不加原因
+                        // 这里简化处理：假设每次刷新都是准确的，直接覆盖时间可能有风险，
+                        // 但在"规则驱动"模式下，我们只需确保 next 晚于 current 即可。
+                        // 简单处理：确保 Next 至少比 Current 晚到达
+                        if (next.getDepartureTime().isBefore(current.getArrivalTime())) {
+                             long fixDiff = Duration.between(next.getDepartureTime(), current.getArrivalTime()).toMinutes();
+                             next.setDepartureTime(next.getDepartureTime().plusMinutes(fixDiff));
+                             next.setArrivalTime(next.getArrivalTime().plusMinutes(fixDiff));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- 尝试起飞 ---
+    public void attemptDeparture(Flight flight) throws Exception {
+        // 1. 锁检查
+        if (!checkAircraftPhysicalAvailability(flight.getAircraft().getRegistrationNumber(), flight.getFlightNumber())) {
+            throw new Exception("Operational Blocked: Aircraft is currently ACTIVE on another flight.");
+        }
+
+        // 2. 确保排期是最新的 (处理潜伏的传播延误)
+        refreshScheduleForAircraft(flight.getAircraft().getRegistrationNumber());
+
+        // 3. 更新状态
+        flight.setStatus("Departed");
+        flight.getAircraft().setStatus("In Flight");
+    }
+
+    // --- 尝试到达 ---
+    public void attemptArrival(Flight flight) {
+        flight.setStatus("Arrived");
+        
+        // 更新飞机状态：如果后面还有活，就是 Scheduled；没事了才是 Available
+        if (hasFutureFlights(flight.getAircraft().getRegistrationNumber())) {
+            flight.getAircraft().setStatus("Scheduled");
+        } else {
+            flight.getAircraft().setStatus("Available");
+        }
+        
+        // 到达后，可能会影响后面的排期，必须刷新
+        refreshScheduleForAircraft(flight.getAircraft().getRegistrationNumber());
+    }
+
+    // --- 手动延误 ---
+    public void manualDelay(Flight flight, String reason) {
+        flight.addDelayReason(reason); // 时间 +1 小时
+        flight.setStatus("Delayed");
+        
+        // 关键：一旦我变了，立刻去推后面的航班
+        refreshScheduleForAircraft(flight.getAircraft().getRegistrationNumber());
+    }
+
+    // --- Save / Load (保持不变) ---
     public void saveData() {
-        try {
-            // 1. 保存飞机
-            PrintWriter aircraftWriter = new PrintWriter(new FileWriter("aircrafts.txt"));
+        try (PrintWriter aircraftWriter = new PrintWriter(new FileWriter("aircrafts.txt"));
+             PrintWriter flightWriter = new PrintWriter(new FileWriter("flights.txt"))) {
+            
             for (Aircraft a : aircrafts.values()) {
                 aircraftWriter.println(String.format("%s,%s,%s,%d,%s",
                         a.getRegistrationNumber(), a.getBrand(), a.getModel(), a.getCapacity(), a.getStatus()));
             }
-            aircraftWriter.close();
 
-            // 2. 保存航班
-            PrintWriter flightWriter = new PrintWriter(new FileWriter("flights.txt"));
             for (Flight f : flights.values()) {
                 String isCargo = (f instanceof CargoFlight) ? "YES" : "NO";
                 double cargoCap = (f instanceof CargoFlight) ? ((CargoFlight) f).getCargoCapacity() : 0.0;
-                
                 String delayString = String.join(";", f.getDelayReasons());
-
-                // [修改] 格式: ..., 载货量, 乘客量, 延误原因串
+                
                 flightWriter.println(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%.2f,%d,%s",
                         f.getFlightNumber(), f.getOrigin(), f.getDestination(),
                         f.getDepartureTime().toString(), f.getArrivalTime().toString(),
                         f.getStatus(), f.getAircraft().getRegistrationNumber(),
-                        isCargo, cargoCap, 
-                        f.getBookedPassengers(), // <--- 保存乘客数
-                        delayString));
+                        isCargo, cargoCap, f.getBookedPassengers(), delayString));
             }
-            flightWriter.close();
-            System.out.println("Data saved successfully.");
-
-        } catch (IOException e) {
-            System.out.println("Error saving data: " + e.getMessage());
-        }
+        } catch (IOException e) { System.out.println("Error saving: " + e.getMessage()); }
     }
 
-    // --- [核心修改]: 读取数据 (解析延误记录 + 乘客数量) ---
     public void loadData() {
         File aircraftFile = new File("aircrafts.txt");
         File flightFile = new File("flights.txt");
-
         if (!aircraftFile.exists() || !flightFile.exists()) return;
 
         try {
-            // 1. 读取飞机
             Scanner sc = new Scanner(aircraftFile);
             while (sc.hasNextLine()) {
-                String line = sc.nextLine();
-                String[] parts = line.split(",");
-                if (parts.length >= 5) {
-                    Aircraft a = new Aircraft(parts[0], parts[1], parts[2], Integer.parseInt(parts[3]), parts[4]);
-                    addAircraft(a);
-                }
+                String[] parts = sc.nextLine().split(",");
+                if (parts.length >= 5) addAircraft(new Aircraft(parts[0], parts[1], parts[2], Integer.parseInt(parts[3]), parts[4]));
             }
             sc.close();
 
-            // 2. 读取航班
             sc = new Scanner(flightFile);
             while (sc.hasNextLine()) {
-                String line = sc.nextLine();
-                // [注意]: 使用 -1 参数，防止split忽略末尾的空字符串
-                String[] parts = line.split(",", -1); 
-                
-                // [修改] 检查长度为 10 (因为加了一列)
+                String[] parts = sc.nextLine().split(",", -1);
                 if (parts.length >= 10) { 
                     String fNum = parts[0];
                     String org = parts[1];
@@ -165,43 +206,40 @@ public class FlightManagementSystem {
                     String planeReg = parts[6];
                     String isCargo = parts[7];
                     double cargoCap = Double.parseDouble(parts[8]);
-                    
-                    // [新增] 读取乘客数 (index 9)
                     int pax = 0;
-                    try {
-                        pax = Integer.parseInt(parts[9]);
-                    } catch (NumberFormatException e) { pax = 0; }
-
-                    // 延误原因变成了 index 10
+                    try { pax = Integer.parseInt(parts[9]); } catch (Exception e) {}
                     String delayReasonStr = (parts.length >= 11) ? parts[10] : "";
-
+                    
                     Aircraft linkedPlane = getAircraft(planeReg);
                     if (linkedPlane != null) {
-                        Flight f;
-                        if ("YES".equals(isCargo)) {
-                            // Cargo 构造函数内部会自动把 pax 设为 0
-                            f = new CargoFlight(fNum, org, dest, dep, arr, linkedPlane, cargoCap);
-                        } else {
-                            // 普通航班，传入读取到的 pax
-                            f = new Flight(fNum, org, dest, dep, arr, linkedPlane, pax);
-                        }
-                        f.setStatus(status);
+                        Flight f = "YES".equals(isCargo) 
+                            ? new CargoFlight(fNum, org, dest, dep, arr, linkedPlane, cargoCap) 
+                            : new Flight(fNum, org, dest, dep, arr, linkedPlane, pax);
                         
+                        f.setStatus(status);
                         if (!delayReasonStr.isEmpty()) {
-                            for (String reason : delayReasonStr.split(";")) {
-                                f.addDelayReason(reason);
-                            }
+                            for (String r : delayReasonStr.split(";")) f.getDelayReasons().add(r);
                         }
                         addFlight(f);
                     }
                 }
             }
             sc.close();
-            System.out.println("Data loaded successfully.");
-
-        } catch (Exception e) {
-            System.out.println("Error loading data: " + e.getMessage());
-            e.printStackTrace(); 
+        } catch (Exception e) { System.out.println("Error loading: " + e.getMessage()); }
+    }
+    
+    public boolean isAircraftAvailable(String regNo, LocalDateTime newDep, LocalDateTime newArr) {
+        for (Flight f : flights.values()) {
+            if (f.getAircraft().getRegistrationNumber().equals(regNo)) {
+                if ("Cancelled".equalsIgnoreCase(f.getStatus())) continue;
+                if (f.getDepartureTime().isBefore(newArr) && f.getArrivalTime().isAfter(newDep)) return false;
+            }
         }
+        return true;
+    }
+    
+    public void updateFlightStatus(String flightNumber, String status) {
+        Flight f = flights.get(flightNumber);
+        if (f != null) f.setStatus(status);
     }
 }
