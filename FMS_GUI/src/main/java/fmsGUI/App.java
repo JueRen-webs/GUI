@@ -480,9 +480,9 @@ public class App extends Application {
                 timeStr += " (+1)";
             }
             String displayTime = "";
-            if ("Scheduled".equalsIgnoreCase(status) || "Boarding".equalsIgnoreCase(status)|| "Cancelled".equalsIgnoreCase(status)) {
+            if ("Cancelled".equalsIgnoreCase(status)) {
                 displayTime = "-"; 
-            } else if ("Arrived".equalsIgnoreCase(status)) {
+            } else if ("Arrived".equalsIgnoreCase(status)|| "Scheduled".equalsIgnoreCase(status) || "Boarding".equalsIgnoreCase(status)) {
                 displayTime = timeStr;
             } else {
                 displayTime = "Est: " + timeStr;
@@ -591,11 +591,22 @@ public class App extends Application {
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 if (item != null && !empty) {
-                    setText(item);
-                    // 如果状态是 Available，显示绿色；Maintenance 显示红色；Scheduled 显示蓝色
-                    if ("Available".equalsIgnoreCase(item)) setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold; -fx-alignment: CENTER;");
-                    else if ("Maintenance".equalsIgnoreCase(item)) setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold; -fx-alignment: CENTER;");
-                    else setStyle("-fx-text-fill: #3498db; -fx-font-weight: bold; -fx-alignment: CENTER;"); // Scheduled or others
+                    
+                    // [修改] 统一显示逻辑：
+                    // 如果状态是 "In Flight" 或 "Departed"，在界面上统一显示为 "Scheduled"
+                    String displayStatus = item;
+                    if ("In Flight".equalsIgnoreCase(item) || "Departed".equalsIgnoreCase(item)) {
+                        displayStatus = "Scheduled";
+                    }
+                    
+                    setText(displayStatus);
+
+                    // 颜色逻辑：Available 绿色，其他（Scheduled/In Flight等）一律蓝色
+                    if ("Available".equalsIgnoreCase(item)) 
+                        setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold; -fx-alignment: CENTER;");
+                    else 
+                        setStyle("-fx-text-fill: #3498db; -fx-font-weight: bold; -fx-alignment: CENTER;");
+                        
                 } else { setText(null); setStyle(""); }
             }
         });
@@ -607,12 +618,12 @@ public class App extends Application {
         colSchedule.setCellValueFactory(cell -> new javafx.beans.property.SimpleObjectProperty<>(cell.getValue()));
         
         colSchedule.setCellFactory(col -> new TableCell<Aircraft, Aircraft>() {
-            private final Button btn = new Button("Check");
+            private final Button btn = new Button("View");
 
             {
                 // 设置按钮样式 (紫色，区别于其他按钮)
                 btn.getStyleClass().add("btn");
-                btn.setStyle("-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 4 12; -fx-background-radius: 15;");
+                btn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 4 12; -fx-background-radius: 15;");
                 
                 // 按钮点击事件：查找该飞机的排期
                 btn.setOnAction(e -> {
@@ -728,15 +739,19 @@ public class App extends Application {
         table.getStyleClass().add("live-board");
         VBox.setVgrow(table, Priority.ALWAYS);
 
-        // --- 列定义 (完全保持不变) ---
+// --- 列定义 ---
+        
+        // 1. Flight No
         TableColumn<Flight, String> colNo = new TableColumn<>();
         colNo.setCellValueFactory(new PropertyValueFactory<>("flightNumber"));
         setupColumnFilter(colNo, "Flight No", filteredData, masterData, activeFilters, Flight::getFlightNumber);
         
+        // 2. Type
         TableColumn<Flight, String> colType = new TableColumn<>();
         colType.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue() instanceof CargoFlight ? "Cargo" : "Passenger"));
         setupColumnFilter(colType, "Type", filteredData, masterData, activeFilters, f -> f instanceof CargoFlight ? "Cargo" : "Passenger");
 
+        // 3. Load / Pax
         TableColumn<Flight, String> colLoad = new TableColumn<>();
         colLoad.setCellValueFactory(cell -> {
             Flight f = cell.getValue();
@@ -748,23 +763,30 @@ public class App extends Application {
              else return f.getBookedPassengers() + " / " + f.getAircraft().getCapacity();
         });
 
+        // 4. Date
         TableColumn<Flight, String> colDate = new TableColumn<>();
         colDate.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getDepartureTime().toLocalDate().toString()));
         setupColumnFilter(colDate, "Date", filteredData, masterData, activeFilters, f -> f.getDepartureTime().toLocalDate().toString());
 
-        TableColumn<Flight, String> colOrigin = new TableColumn<>();
-        colOrigin.setCellValueFactory(new PropertyValueFactory<>("origin"));
-        setupColumnFilter(colOrigin, "Origin", filteredData, masterData, activeFilters, Flight::getOrigin);
+        // [修改] 5. Aircraft (替换掉了原来的 Origin)
+        TableColumn<Flight, String> colAircraft = new TableColumn<>();
+        // 获取飞机的注册号 (e.g., 9M-MRO)
+        colAircraft.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getAircraft().getRegistrationNumber()));
+        // 添加 Filter 逻辑
+        setupColumnFilter(colAircraft, "Aircraft", filteredData, masterData, activeFilters, f -> f.getAircraft().getRegistrationNumber());
 
+        // 6. Destination
         TableColumn<Flight, String> colDest = new TableColumn<>();
         colDest.setCellValueFactory(new PropertyValueFactory<>("destination"));
         setupColumnFilter(colDest, "Destination", filteredData, masterData, activeFilters, Flight::getDestination);
 
+        // 7. Dep Time
         TableColumn<Flight, String> colDepTime = new TableColumn<>("Dep Time (UTC+8)");
         colDepTime.setCellValueFactory(cell -> new SimpleStringProperty(
                 cell.getValue().getDepartureTime().toLocalTime().toString()));
         setupColumnFilter(colDepTime, "Dep Time (UTC+8)", filteredData, masterData, activeFilters, f -> f.getDepartureTime().toLocalTime().toString());
 
+        // 8. Arr Time
         TableColumn<Flight, String> colArrTime = new TableColumn<>("Arr Time (UTC+8)");
         colArrTime.setCellValueFactory(cell -> {
              Flight f = cell.getValue();
@@ -790,6 +812,7 @@ public class App extends Application {
         });
         setupColumnFilter(colArrTime, "Arr Time (UTC+8)", filteredData, masterData, activeFilters, f -> f.getArrivalTime().toLocalTime().toString());
 
+        // 9. Status
         TableColumn<Flight, String> colStatus = new TableColumn<>();
         colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
         colStatus.setCellFactory(col -> new TableCell<Flight, String>() {
@@ -806,25 +829,31 @@ public class App extends Application {
         });
         setupColumnFilter(colStatus, "Status", filteredData, masterData, activeFilters, Flight::getStatus);
 
-        // 2. 先把所有列加进去 (关键步骤：必须先加列，再设排序)
-        table.getColumns().addAll(colNo, colType, colLoad, colDate, colOrigin, colDest, colDepTime, colArrTime, colStatus);
+        // ---------------------------------------------------------
+        // [关键修改] 更新列添加顺序 (移除了 colOrigin，加入了 colAircraft)
+        // ---------------------------------------------------------
+        table.getColumns().addAll(colNo, colType, colLoad, colDate, colAircraft, colDest, colDepTime, colArrTime, colStatus);
 
-        // 3. [排序修复] 在列加入表格后，立即应用排序
-        // 逻辑：先按日期排，再按时间排
+        // [排序修复] 保持不变
         colDate.setSortType(TableColumn.SortType.ASCENDING);
         colDepTime.setSortType(TableColumn.SortType.ASCENDING);
         table.getSortOrder().addAll(colDate, colDepTime); 
 
-        // 4. [排版保留] 手动绑定宽度 (排版不会乱)
+        // ---------------------------------------------------------
+        // [关键修改] 更新列宽绑定 (colAircraft 继承了原 Origin 的宽度位置)
+        // ---------------------------------------------------------
         colNo.prefWidthProperty().bind(table.widthProperty().multiply(0.10));      
         colType.prefWidthProperty().bind(table.widthProperty().multiply(0.08));    
         colLoad.prefWidthProperty().bind(table.widthProperty().multiply(0.11));    
         colDate.prefWidthProperty().bind(table.widthProperty().multiply(0.10));    
-        colOrigin.prefWidthProperty().bind(table.widthProperty().multiply(0.09));  
+        
+        // 原本是 colOrigin (0.09)，现在改为 colAircraft
+        colAircraft.prefWidthProperty().bind(table.widthProperty().multiply(0.09));  
+        
         colDest.prefWidthProperty().bind(table.widthProperty().multiply(0.13));    
         colDepTime.prefWidthProperty().bind(table.widthProperty().multiply(0.15)); 
         colArrTime.prefWidthProperty().bind(table.widthProperty().multiply(0.14)); 
-        colStatus.prefWidthProperty().bind(table.widthProperty().multiply(0.10));  
+        colStatus.prefWidthProperty().bind(table.widthProperty().multiply(0.10)); 
 
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_RIGHT);
@@ -1110,9 +1139,8 @@ public class App extends Application {
             private final Button btn = new Button("View"); // 按钮文字改短一点
 
             {
-                btn.getStyleClass().add("btn"); 
-                // 按钮做得更小巧精致
-                btn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 15px; -fx-padding: 2 15; -fx-background-radius: 8;");
+            	btn.getStyleClass().add("btn");
+                btn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 4 12; -fx-background-radius: 15;");
                 
                 btn.setOnAction(e -> {
                     Flight f = getItem();
@@ -1321,8 +1349,8 @@ public class App extends Application {
             else cargoWeightField.clear();         
         });
 
-        system.getAllAircrafts().stream().filter(a -> "Available".equalsIgnoreCase(a.getStatus()) || "Scheduled".equalsIgnoreCase(a.getStatus()))
-              .forEach(a -> aircraftBox.getItems().add(a.getRegistrationNumber()));
+        system.getAllAircrafts().stream()
+        .forEach(a -> aircraftBox.getItems().add(a.getRegistrationNumber()));
 
         grid.add(new Label("Flight No:"), 0, 0); grid.add(flightNoField, 1, 0);
         grid.add(new Label("Destination:"), 0, 1); grid.add(destField, 1, 1);
@@ -1467,7 +1495,28 @@ public class App extends Application {
         });
     }
     
-    // 替换 App.java 中的这个方法
+ // [检查方法] 确保同一架飞机的上一班航班已经“抵达”或“取消”
+    private boolean isPreviousFlightCompleted(Flight currentFlight) {
+        for (Flight f : system.getAllFlights()) {
+            // 1. 找到同一架飞机的其他航班 (排除自己)
+            if (f != currentFlight && 
+                f.getAircraft().getRegistrationNumber().equals(currentFlight.getAircraft().getRegistrationNumber())) {
+                
+                // 2. 检查 f 是否是比当前航班“更早”的航班
+                if (f.getDepartureTime().isBefore(currentFlight.getDepartureTime())) {
+                    
+                    // 3. 检查状态：如果更早的航班既没抵达(Arrived)，也没取消(Cancelled)
+                    // 意味着它还在排队(Scheduled)或者还在飞(Departed)，那现在的航班就不能动。
+                    String s = f.getStatus();
+                    if (!"Arrived".equalsIgnoreCase(s) && !"Cancelled".equalsIgnoreCase(s)) {
+                        return false; // 拦截：上一班还没完事
+                    }
+                }
+            }
+        }
+        return true; // 通过：所有前序航班都搞定了
+    }
+    
     private void showUpdateStatusDialog(Flight flight) {
         List<String> options = Arrays.asList("Boarding", "Departed", "Arrived", "Delayed", "Cancelled");
         
@@ -1478,15 +1527,29 @@ public class App extends Application {
 
         dialog.showAndWait().ifPresent(newStatus -> {
             try {
+                // ============================================================
+                // [新增核心逻辑] 顺序校验
+                // 如果操作不是“取消”，则必须确保上一班机已完成任务
+                // ============================================================
+                if (!"Cancelled".equalsIgnoreCase(newStatus)) {
+                     if (!isPreviousFlightCompleted(flight)) {
+                         // 弹窗警告
+                         showAlert("Sequence Error", 
+                             "Operation Blocked!\n\n" + 
+                             "Aircraft " + flight.getAircraft().getRegistrationNumber() + 
+                             " has a previous flight that is not yet Arrived or Cancelled.\n" +
+                             "Please complete previous flights first.");
+                         return; // 这里的 return 非常重要，直接终止后续代码执行
+                     }
+                }
+                // ============================================================
+
                 // --- 1. 尝试起飞 ---
                 if ("Departed".equals(newStatus)) {
                     if ("Departed".equals(flight.getStatus())) return; 
                     
-                    // 系统会检查锁 + 自动刷新传播延误
                     system.attemptDeparture(flight); 
-                    
                     showAlert("Success", "Flight Departed.");
-                    // 刷新表格：如果这一班被传播延误了，时间会变；后面的航班时间也可能变
                     showFlightView(); 
 
                 // --- 2. 尝试到达 ---
@@ -1495,20 +1558,20 @@ public class App extends Application {
                     showAlert("Success", "Flight Arrived.");
                     showFlightView();
 
-                // --- 3. 手动延误 (关键修改) ---
+                // --- 3. 手动延误 ---
                 } else if ("Delayed".equals(newStatus)) {
-                    // 弹出原因选择 -> 用户确认 -> 调用 manualDelay
                     showDelayReasonDialog(flight, (reason) -> {
                          system.manualDelay(flight, reason);
                          showAlert("Updated", "Delay recorded. Subsequent flights have been updated.");
-                         showFlightView(); // 刷新表格，你会立刻看到多米诺效应
+                         showFlightView(); 
                     });
 
-                // --- 4. 其他状态 ---
+                // --- 4. 其他状态 (Boarding, Cancelled 等) ---
                 } else {
                     system.updateFlightStatus(flight.getFlightNumber(), newStatus);
+                    
+                    // 如果取消了，释放飞机资源，并刷新排期
                     if ("Cancelled".equals(newStatus)) {
-                        // 取消也会释放资源，可能需要刷新排期 (防止之前的延误一直占着坑)
                         flight.getAircraft().setStatus("Available");
                         system.refreshScheduleForAircraft(flight.getAircraft().getRegistrationNumber());
                     }
@@ -1516,13 +1579,12 @@ public class App extends Application {
                 }
 
             } catch (Exception e) {
-                // 如果互斥锁拦截了，会显示在这里
                 showAlert("Action Blocked", e.getMessage());
             }
         });
     }
 
-    // 替换 App.java 中的这个方法 (增加了回调参数)
+    // 替换 App.java 中的 showDelayReasonDialog 方法
     private void showDelayReasonDialog(Flight flight, java.util.function.Consumer<String> onConfirm) {
         Dialog<String> delayDialog = new Dialog<>();
         delayDialog.setTitle("Delay Details");
@@ -1537,18 +1599,26 @@ public class App extends Application {
         delayMap.put("Others", new ArrayList<>()); 
 
         GridPane grid = new GridPane();
-        grid.setHgap(10); grid.setVgap(10); grid.setPadding(new Insets(20, 150, 10, 10));
+        grid.setHgap(10); grid.setVgap(10); 
+        
+        // [修改 1] 这里的 Padding 原本是 (20, 150, 10, 10)，现在改小为 (20, 20, 10, 10)
+        grid.setPadding(new Insets(20, 20, 10, 10)); 
 
         ComboBox<String> categoryBox = new ComboBox<>();
         categoryBox.getItems().addAll(delayMap.keySet());
         categoryBox.setPromptText("Category");
+        // [修改 2] 限制宽度，防止太宽
+        categoryBox.setPrefWidth(200); 
 
         ComboBox<String> reasonBox = new ComboBox<>();
         reasonBox.setPromptText("Reason");
         reasonBox.setVisible(false);
+        reasonBox.setPrefWidth(200); // 限制宽度
 
         TextArea otherField = new TextArea();
-        otherField.setVisible(false); otherField.setPrefHeight(50);
+        otherField.setVisible(false); 
+        otherField.setPrefHeight(60); // 高度稍微给够一点点
+        otherField.setPrefWidth(200); // 限制宽度
 
         grid.add(new Label("Category:"), 0, 0); grid.add(categoryBox, 1, 0);
         grid.add(new Label("Reason:"), 0, 1);
@@ -1558,6 +1628,7 @@ public class App extends Application {
 
         delayDialog.getDialogPane().setContent(grid);
 
+        // 逻辑部分保持不变
         categoryBox.setOnAction(e -> {
             String cat = categoryBox.getValue();
             if ("Others".equals(cat)) {

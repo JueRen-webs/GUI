@@ -1,2 +1,2 @@
-9M-888,Boeing,737-888,227,In Flight
-9M-111,Airbus,222-737,300,Available
+9M-888,Boeing,737-888,227,Scheduled
+9M-111,Airbus,222-737,300,Scheduled

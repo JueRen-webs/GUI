@@ -27,7 +27,13 @@ public class FlightManagementSystem {
     // --- 基础 CRUD ---
     public void addFlight(Flight flight) { 
         flights.put(flight.getFlightNumber(), flight); 
-        flight.getAircraft().setStatus("Scheduled"); // 有排班了，状态更新
+        
+        // [修复] 防止覆盖掉 "In Flight" 或 "Departed" 这种正在进行的状态
+        // 逻辑：只有当飞机当前是 "Available" (完全空闲) 时，才将其标记为 "Scheduled"
+        // 如果它已经在飞 (In Flight) 或者已经有排期 (Scheduled)，则保持原状态不变
+        if ("Available".equalsIgnoreCase(flight.getAircraft().getStatus())) {
+            flight.getAircraft().setStatus("Scheduled"); 
+        }
     }
     
     public void deleteFlight(String flightNumber) {
