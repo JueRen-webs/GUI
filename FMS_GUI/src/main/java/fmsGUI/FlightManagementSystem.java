@@ -24,13 +24,12 @@ public class FlightManagementSystem {
         this.aircrafts = new HashMap<>();
     }
 
-    // --- 基础 CRUD ---
+    // --- Basic CRUD Operations ---
     public void addFlight(Flight flight) { 
         flights.put(flight.getFlightNumber(), flight); 
         
-        // [修复] 防止覆盖掉 "In Flight" 或 "Departed" 这种正在进行的状态
-        // 逻辑：只有当飞机当前是 "Available" (完全空闲) 时，才将其标记为 "Scheduled"
-        // 如果它已经在飞 (In Flight) 或者已经有排期 (Scheduled)，则保持原状态不变
+        // Logic fix: Only set status to "Scheduled" if currently "Available"
+        // Prevents overwriting "In Flight" or active states
         if ("Available".equalsIgnoreCase(flight.getAircraft().getStatus())) {
             flight.getAircraft().setStatus("Scheduled"); 
         }
@@ -39,7 +38,7 @@ public class FlightManagementSystem {
     public void deleteFlight(String flightNumber) {
         Flight f = flights.get(flightNumber);
         if (f != null && f.getAircraft() != null) {
-            // 删除后，如果飞机后面没事了，就设为 Available
+            // Set aircraft to Available if no future tasks remain
             if (!hasFutureFlights(f.getAircraft().getRegistrationNumber())) {
                 f.getAircraft().setStatus("Available");
             }
@@ -54,7 +53,7 @@ public class FlightManagementSystem {
     public Aircraft getAircraft(String regNumber) { return aircrafts.get(regNumber); }
     public List<Aircraft> getAllAircrafts() { return new ArrayList<>(aircrafts.values()); }
 
-    // --- [辅助] 检查飞机未来是否还有任务 ---
+    // --- Helper: Check for future flights ---
     private boolean hasFutureFlights(String regNo) {
         return flights.values().stream()
                 .filter(f -> f.getAircraft().getRegistrationNumber().equals(regNo))
@@ -63,16 +62,15 @@ public class FlightManagementSystem {
                             || "Boarding".equalsIgnoreCase(f.getStatus()));
     }
 
-    // --- [核心逻辑 1] 互斥锁 ---
-    // 修复：只检查当前 "正在进行中" (Departed/In Flight) 的航班。
-    // Scheduled 的航班不应该锁死飞机。
+    // --- Core Logic 1: Mutex / Availability Check ---
+    // Checks if the aircraft is physically occupied by another active flight
     public boolean checkAircraftPhysicalAvailability(String aircraftReg, String currentFlightId) {
         for (Flight f : flights.values()) {
-            if (f.getFlightNumber().equals(currentFlightId)) continue; // 排除自己
+            if (f.getFlightNumber().equals(currentFlightId)) continue; 
             
             if (f.getAircraft().getRegistrationNumber().equals(aircraftReg)) {
                 String s = f.getStatus();
-                // 只有这些状态才表示飞机物理上被占用了
+                // Block if active
                 if ("Departed".equalsIgnoreCase(s) || "In Flight".equalsIgnoreCase(s) || "Boarding".equalsIgnoreCase(s)) {
                     return false; 
                 }
@@ -81,37 +79,34 @@ public class FlightManagementSystem {
         return true; 
     }
 
-    // --- [核心逻辑 2] 多米诺骨牌式排期刷新 ---
-    // 当某一班时间变动，自动把后面的航班往后推
+    // --- Core Logic 2: Cascade Schedule Updates (Domino Effect) ---
+    // Propagate delays to subsequent flights if timing overlaps
     public void refreshScheduleForAircraft(String regNo) {
-        // 1. 找出这架飞机的所有航班，按时间排序
+        // 1. Get all flights for aircraft, sorted by time
         List<Flight> sortedFlights = flights.values().stream()
                 .filter(f -> f.getAircraft().getRegistrationNumber().equals(regNo))
                 .sorted(Comparator.comparing(Flight::getDepartureTime))
                 .collect(Collectors.toList());
 
-        // 2. 遍历并处理冲突
+        // 2. Check for conflicts and propagate delays
         for (int i = 0; i < sortedFlights.size() - 1; i++) {
             Flight current = sortedFlights.get(i);
             Flight next = sortedFlights.get(i+1);
 
-            // 如果 前一班到达时间 > 后一班计划起飞时间
+            // If Arrival Time > Next Departure Time
             if (current.getArrivalTime().isAfter(next.getDepartureTime())) {
                 
                 long diff = Duration.between(next.getDepartureTime(), current.getArrivalTime()).toMinutes();
                 
                 if (diff > 0) {
-                    // 防止重复添加相同的延误原因
+                    // Avoid duplicate delay reasons
                     String reason = "Propagated Delay: Late arrival of " + current.getFlightNumber();
                     boolean exists = next.getDelayReasons().stream().anyMatch(r -> r.startsWith(reason));
                     
                     if (!exists) {
                         next.addPropagatedDelay(reason, diff);
                     } else {
-                        // 如果原因已存在，但时间还需要调整，直接改时间不加原因
-                        // 这里简化处理：假设每次刷新都是准确的，直接覆盖时间可能有风险，
-                        // 但在"规则驱动"模式下，我们只需确保 next 晚于 current 即可。
-                        // 简单处理：确保 Next 至少比 Current 晚到达
+                        // Adjust time only if needed
                         if (next.getDepartureTime().isBefore(current.getArrivalTime())) {
                              long fixDiff = Duration.between(next.getDepartureTime(), current.getArrivalTime()).toMinutes();
                              next.setDepartureTime(next.getDepartureTime().plusMinutes(fixDiff));
@@ -123,46 +118,59 @@ public class FlightManagementSystem {
         }
     }
 
-    // --- 尝试起飞 ---
+    // --- Attempt Departure ---
     public void attemptDeparture(Flight flight) throws Exception {
-        // 1. 锁检查
+        // 1. Check availability
         if (!checkAircraftPhysicalAvailability(flight.getAircraft().getRegistrationNumber(), flight.getFlightNumber())) {
             throw new Exception("Operational Blocked: Aircraft is currently ACTIVE on another flight.");
         }
 
-        // 2. 确保排期是最新的 (处理潜伏的传播延误)
+        // 2. Refresh schedule to handle latent delays
         refreshScheduleForAircraft(flight.getAircraft().getRegistrationNumber());
 
-        // 3. 更新状态
+        // 3. Update status
         flight.setStatus("Departed");
-        flight.getAircraft().setStatus("In Flight");
+        autoUpdateAircraftStatus(flight.getAircraft().getRegistrationNumber());
     }
 
-    // --- 尝试到达 ---
+    public void autoUpdateAircraftStatus(String regNo) {
+        Aircraft a = aircrafts.get(regNo);
+        if (a == null) return;
+
+     // Check if there are any incomplete flights linked to this aircraft
+        // This covers all active states: Scheduled, Boarding, Departed, In Flight, Delayed
+        boolean isBusy = flights.values().stream()
+                .filter(f -> f.getAircraft().getRegistrationNumber().equals(regNo))
+                .anyMatch(f -> {
+                    String s = f.getStatus();
+                    // If the flight is NOT 'Arrived' and NOT 'Cancelled', it means it is still active.
+                    return !"Arrived".equalsIgnoreCase(s) && !"Cancelled".equalsIgnoreCase(s);
+                });
+
+        if (isBusy) {
+            a.setStatus("Scheduled");
+        } else {
+            a.setStatus("Available");
+        }
+    }
+
     public void attemptArrival(Flight flight) {
         flight.setStatus("Arrived");
         
-        // 更新飞机状态：如果后面还有活，就是 Scheduled；没事了才是 Available
-        if (hasFutureFlights(flight.getAircraft().getRegistrationNumber())) {
-            flight.getAircraft().setStatus("Scheduled");
-        } else {
-            flight.getAircraft().setStatus("Available");
-        }
+        autoUpdateAircraftStatus(flight.getAircraft().getRegistrationNumber());
         
-        // 到达后，可能会影响后面的排期，必须刷新
         refreshScheduleForAircraft(flight.getAircraft().getRegistrationNumber());
     }
-
-    // --- 手动延误 ---
+    // --- Manual Delay ---
     public void manualDelay(Flight flight, String reason) {
-        flight.addDelayReason(reason); // 时间 +1 小时
+        flight.addDelayReason(reason); // Adds 1 hour
         flight.setStatus("Delayed");
         
-        // 关键：一旦我变了，立刻去推后面的航班
+        // Critical: Refresh subsequent flights immediately
         refreshScheduleForAircraft(flight.getAircraft().getRegistrationNumber());
     }
 
-    // --- Save / Load (保持不变) ---
+    // --- Save / Load ---
     public void saveData() {
         try (PrintWriter aircraftWriter = new PrintWriter(new FileWriter("aircrafts.txt"));
              PrintWriter flightWriter = new PrintWriter(new FileWriter("flights.txt"))) {
@@ -231,6 +239,11 @@ public class FlightManagementSystem {
                 }
             }
             sc.close();
+            
+            for (String reg : aircrafts.keySet()) {
+                autoUpdateAircraftStatus(reg);
+            }
+
         } catch (Exception e) { System.out.println("Error loading: " + e.getMessage()); }
     }
     

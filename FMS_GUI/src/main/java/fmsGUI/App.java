@@ -1,6 +1,6 @@
 package fmsGUI;
 
-// 导入 JavaFX 的各种库，用于画图
+// JavaFX imports
 import javafx.application.Application;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -12,9 +12,9 @@ import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.control.*; // 包含 Button, Label, TextField 等控件
+import javafx.scene.control.*; 
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.layout.*;  // 包含 VBox, HBox, BorderPane 等布局
+import javafx.scene.layout.*;  
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -28,60 +28,56 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.DatePicker;
 import javafx.scene.layout.GridPane;
-import javafx.util.Callback;
 
-// App 类继承 Application，这是 JavaFX 的标准写法
+// Main application class
 public class App extends Application {
 
-    private FlightManagementSystem system = new FlightManagementSystem(); // 创建逻辑系统实例
-    private BorderPane rootLayout; // 根布局，分上、下、左、右、中
-    private VBox centerContent;    // 中间区域的内容，我们将在这里切换不同的视图
+    private FlightManagementSystem system = new FlightManagementSystem(); 
+    private BorderPane rootLayout; 
+    private VBox centerContent;    
 
-    // --- 启动方法 ---
+    // --- Start Method ---
     @Override
     public void start(Stage stage) {
-        // 1. 启动时先加载数据
+        // 1. Load data on startup
         system.loadData();
         
+        rootLayout = new BorderPane(); 
+        VBox sideMenu = createSideMenu(); 
+        rootLayout.setLeft(sideMenu);     
 
-        rootLayout = new BorderPane(); // 创建根布局
-        VBox sideMenu = createSideMenu(); // 创建左侧菜单
-        rootLayout.setLeft(sideMenu);     // 把菜单放在左边
+        centerContent = new VBox(20);     
+        centerContent.setPadding(new Insets(20)); 
+        rootLayout.setCenter(centerContent); 
 
-        centerContent = new VBox(20);     // 创建中间区域，元素间距 20
-        centerContent.setPadding(new Insets(20)); // 内边距 20
-        rootLayout.setCenter(centerContent); // 把中间区域放在中间
+        showDashboard(); // Default view
 
-        showDashboard(); // 默认显示仪表盘
-
-        Scene scene = new Scene(rootLayout, 1000, 600); // 创建场景，宽1000，高600
+        Scene scene = new Scene(rootLayout, 1000, 600); 
         
-        // 加载 CSS 样式文件 (美化界面)
+        // Load CSS styles
         if (getClass().getResource("/style.css") != null) {
             scene.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
         }
         
-        stage.setTitle("Flight Management System (Pro Version)"); // [新手修改]: 修改窗口标题
+        stage.setTitle("Flight Management System (Pro Version)"); 
         stage.setScene(scene);
-        stage.show(); // 显示窗口
-        
+        stage.show(); 
     }
 
-    // --- 停止方法 (关闭窗口时触发) ---
+    // --- Stop Method (Cleanup) ---
     @Override
     public void stop() throws Exception {
-        system.saveData(); // 自动保存数据
+        system.saveData(); // Auto-save on exit
         super.stop();
     }
 
-    // [新增] 用来存放侧边栏的 4 个主要导航按钮，方便后续切换样式
+    // Track side menu buttons for highlighting
     private List<Button> sideMenuBtns = new ArrayList<>();
 
-    // --- 创建左侧菜单 ---
+    // --- Create Side Menu ---
     private VBox createSideMenu() {
         VBox menu = new VBox(0); 
         menu.setPadding(new Insets(20));
@@ -91,21 +87,21 @@ public class App extends Application {
         Label title = new Label("FMS System"); 
         title.getStyleClass().add("sidebar-title");
 
-        // 1. 创建按钮
+        // 1. Create buttons
         Button btnDashboard = createMenuButton("Dashboard");
         Button btnAircraft = createMenuButton("Aircraft Management");
         Button btnFlight = createMenuButton("Flight Management");
         Button btnReports = createMenuButton("Reports & Analytics");
         Button btnExit = createMenuButton("Exit");
 
-        // 2. [关键] 把需要高亮切换的按钮存入列表 (Exit 按钮不需要保持高亮，所以不放进去)
-        sideMenuBtns.clear(); // 清空一下，防止重复添加
+        // 2. Register buttons for highlighting (Exit doesn't need to stay active)
+        sideMenuBtns.clear(); 
         sideMenuBtns.addAll(Arrays.asList(btnDashboard, btnAircraft, btnFlight, btnReports));
 
-        // 3. 设置点击事件 (点击后 -> 切换界面 -> 更新按钮高亮)
+        // 3. Set click actions (Switch View + Update Highlight)
         btnDashboard.setOnAction(e -> { 
             showDashboard(); 
-            updateMenuState(btnDashboard); // 高亮自己
+            updateMenuState(btnDashboard); 
         });
         
         btnAircraft.setOnAction(e -> { 
@@ -124,11 +120,21 @@ public class App extends Application {
         });
         
         btnExit.setOnAction(e -> {
-            system.saveData(); 
-            System.exit(0);    
+            system.saveData(); // 1. Save Data
+            
+            // 2. Show Success Alert
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Exit Success");
+            alert.setHeaderText("Data Saved");
+            alert.setContentText("All system data has been saved successfully.\nExiting application now.");
+            
+            // 3. Wait for user to click "OK" before closing
+            alert.showAndWait(); 
+            
+            System.exit(0);    // 4. Terminate App
         });
 
-        // 4. [初始化] 程序刚启动时，默认高亮 Dashboard 按钮
+        // 4. Default active state
         updateMenuState(btnDashboard);
 
         menu.getChildren().addAll(title, new Separator(), btnDashboard, btnAircraft, btnFlight, btnReports, new Separator(), btnExit);
@@ -136,7 +142,7 @@ public class App extends Application {
     }
 
     // ==========================================
-    //  [核心功能] Excel 风格列头筛选 (修复 Select All 状态逻辑)
+    //  Core: Excel-style column filtering
     // ==========================================
     private <T> void setupColumnFilter(
             TableColumn<T, ?> column,
@@ -146,11 +152,11 @@ public class App extends Application {
             Map<String, java.util.function.Predicate<T>> activeFilters,
             java.util.function.Function<T, String> valueExtractor) {
 
-        // --- 1. 状态记忆 ---
+        // --- 1. Snapshot values ---
         java.util.Set<String> selectedItems = new java.util.HashSet<>();
         masterData.forEach(item -> selectedItems.add(valueExtractor.apply(item)));
 
-        // --- 2. 自定义列头布局 ---
+        // --- 2. Custom Header Layout ---
         StackPane headerPane = new StackPane();
         headerPane.setAlignment(Pos.CENTER);
         
@@ -171,7 +177,7 @@ public class App extends Application {
         column.setGraphic(headerPane);
         column.setText(""); 
 
-        // --- 3. Filter 菜单逻辑 ---
+        // --- 3. Filter Menu Logic ---
         ContextMenu menu = new ContextMenu();
         final long[] lastHideTime = {0}; 
         menu.setOnHidden(e -> lastHideTime[0] = System.currentTimeMillis());
@@ -183,7 +189,7 @@ public class App extends Application {
 
             menu.getItems().clear();
 
-            // --- A. 排序 ---
+            // --- A. Sorting ---
             MenuItem sortAsc = new MenuItem("Sort Ascending  ⬆");
             sortAsc.setOnAction(evt -> {
                 column.getTableView().getSortOrder().clear();
@@ -198,7 +204,7 @@ public class App extends Application {
                 column.getTableView().getSortOrder().add(column);
             });
 
-            // --- B. 筛选区域 ---
+            // --- B. Filter Area ---
             CustomMenuItem filterItem = new CustomMenuItem();
             filterItem.setHideOnClick(false);
 
@@ -214,7 +220,7 @@ public class App extends Application {
 
             // [Row 2] Select All
             CheckBox cbSelectAll = new CheckBox("(Select All)");
-            // 注意：这里先不要设置 setSelected(true)，因为我们要根据下面的列表来决定
+            // Note: Don't set selected yet, depends on the list state
             cbSelectAll.setStyle("-fx-font-size: 11px; -fx-text-fill: #2c3e50; -fx-focus-color: transparent; -fx-faint-focus-color: transparent;");
             
             HBox selectAllBox = new HBox(cbSelectAll);
@@ -253,7 +259,7 @@ public class App extends Application {
                 }
             });
 
-            // 数据准备
+            // Prepare Data
             List<String> uniqueValues = masterData.stream()
                     .map(valueExtractor)
                     .distinct()
@@ -261,7 +267,7 @@ public class App extends Application {
                     .collect(java.util.stream.Collectors.toList());
 
             List<CheckBox> allCheckBoxes = new ArrayList<>();
-            // [修复 Bug] 统计当前被选中的数量，用于判断是否要勾选 "Select All"
+            // Track selection count to determine "Select All" state
             boolean isAllSelected = true; 
 
             for (String val : uniqueValues) {
@@ -269,12 +275,11 @@ public class App extends Application {
                 boolean isChecked = selectedItems.contains(val);
                 cb.setSelected(isChecked);
                 
-                // 如果发现有一个没勾选，全选标志就设为 false
                 if (!isChecked) {
                     isAllSelected = false;
                 }
 
-                // 联动逻辑: 子选项取消 -> Select All 取消
+                // Sync: Uncheck "Select All" if a child is deselected
                 cb.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
                    if (!isSelected) cbSelectAll.setSelected(false);
                 });
@@ -282,15 +287,14 @@ public class App extends Application {
             }
             listView.getItems().addAll(allCheckBoxes);
 
-            // [修复 Bug] 根据统计结果，设置 Select All 的初始状态
-            // 只有当列表里所有项都处于勾选状态时，Select All 才是勾选的
+            // Set initial "Select All" state
             if (uniqueValues.isEmpty()) {
                 cbSelectAll.setSelected(false);
             } else {
                 cbSelectAll.setSelected(isAllSelected);
             }
 
-            // Select All 点击逻辑
+            // Select All Action
             cbSelectAll.setOnAction(evt -> {
                 boolean state = cbSelectAll.isSelected();
                 for (CheckBox cb : allCheckBoxes) {
@@ -298,7 +302,7 @@ public class App extends Application {
                 }
             });
 
-            // 搜索逻辑
+            // Search Logic
             searchField.textProperty().addListener((obs, oldVal, newVal) -> {
                 listView.getItems().clear();
                 if (newVal == null || newVal.isEmpty()) {
@@ -313,7 +317,7 @@ public class App extends Application {
                 }
             });
 
-            // 底部按钮栏
+            // Footer Buttons
             HBox btnBox = new HBox(10);
             btnBox.setAlignment(Pos.CENTER_RIGHT);
             btnBox.setPadding(new Insets(8, 0, 0, 0));
@@ -326,7 +330,7 @@ public class App extends Application {
 
             btnBox.getChildren().addAll(btnReset, btnApply);
 
-            // Apply 逻辑
+            // Apply Action
             btnApply.setOnAction(evt -> {
                 selectedItems.clear();
                 for (CheckBox cb : allCheckBoxes) {
@@ -355,7 +359,7 @@ public class App extends Application {
                 menu.hide();
             });
 
-            // Reset 逻辑
+            // Reset Action
             btnReset.setOnAction(evt -> {
                 selectedItems.clear();
                 masterData.forEach(item -> selectedItems.add(valueExtractor.apply(item)));
@@ -373,7 +377,7 @@ public class App extends Application {
                 menu.hide();
             });
 
-            // 组装
+            // Assemble
             filterBox.getChildren().addAll(searchField, selectAllBox, listView, btnBox); 
             filterItem.setContent(filterBox);
             menu.getItems().addAll(sortAsc, sortDesc, new SeparatorMenuItem(), filterItem);
@@ -381,39 +385,36 @@ public class App extends Application {
         });
     }
     
-    // [新增辅助方法] 切换菜单的高亮状态
+    // Helper: Toggle active menu button state
     private void updateMenuState(Button activeBtn) {
         for (Button btn : sideMenuBtns) {
-            // 如果是当前点击的按钮，加上 "active" 样式
             if (btn == activeBtn) {
                 if (!btn.getStyleClass().contains("active")) {
                     btn.getStyleClass().add("active");
                 }
-            } 
-            // 如果不是，移除 "active" 样式
-            else {
+            } else {
                 btn.getStyleClass().remove("active");
             }
         }
     }
 
-    // 辅助方法：快速创建统一风格的菜单按钮
+    // Helper: Create styled menu button
     private Button createMenuButton(String text) {
         Button btn = new Button(text);
-        btn.setMaxWidth(Double.MAX_VALUE); // 让按钮填满宽度
-        btn.getStyleClass().add("menu-btn"); // 应用 CSS
+        btn.setMaxWidth(Double.MAX_VALUE); 
+        btn.getStyleClass().add("menu-btn"); 
         return btn;
     }
 
-    // ================== 1. 仪表盘视图 (Dashboard) ==================
+    // ================== 1. Dashboard View ==================
     private void showDashboard() {
         centerContent.getChildren().clear(); 
 
-        // 1. 页面大标题 (不放按钮了)
+        // Header
         Label header = new Label("Operational Dashboard");
         header.getStyleClass().add("content-header");
 
-        // --- 统计数据 ---
+        // --- Stats ---
         int totalFlights = system.getAllFlights().size();
         int totalAircraft = system.getAllAircrafts().size();
         long activeFlights = system.getAllFlights().stream()
@@ -427,31 +428,31 @@ public class App extends Application {
                 createStatCard("Scheduled Flights", String.valueOf(totalFlights)),
                 createStatCard("Departed", String.valueOf(activeFlights)));
 
-        // --- 表格区域头部 (标题左对齐，按钮右对齐) ---
+        // --- Table Header ---
         HBox tableHeaderBox = new HBox();
         tableHeaderBox.setAlignment(Pos.CENTER_LEFT);
-        tableHeaderBox.setPadding(new Insets(20, 0, 10, 0)); // 上边距20，下边距10
+        tableHeaderBox.setPadding(new Insets(20, 0, 10, 0)); 
 
         Label listHeader = new Label("Live Flight Status Board");
         listHeader.setFont(Font.font("Arial", FontWeight.BOLD, 18));
         
         Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS); // 占位符，把按钮推到最右边
+        HBox.setHgrow(spacer, Priority.ALWAYS); 
 
-        // 排序按钮
+        // Sort Button
         Button btnSort = new Button("Sort: Ascending ⬆");
         btnSort.getStyleClass().addAll("btn", "btn-secondary");
         btnSort.setStyle("-fx-font-size: 12px; -fx-padding: 5 10;");
 
         tableHeaderBox.getChildren().addAll(listHeader, spacer, btnSort);
 
-        // --- 表格构建 ---
+        // --- Table Construction ---
         TableView<Flight> statusTable = new TableView<>();
         statusTable.getStyleClass().add("live-board"); 
         statusTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY); 
         statusTable.setPrefHeight(400);
 
-        // 定义列
+        // Columns
         TableColumn<Flight, String> colNo = new TableColumn<>("Flight No");
         colNo.setCellValueFactory(new PropertyValueFactory<>("flightNumber"));
 
@@ -514,14 +515,14 @@ public class App extends Application {
         statusTable.getColumns().addAll(colNo, colDate, colOrigin, colDest, colDepTime, colArrTime, colStatus); 
         statusTable.setItems(FXCollections.observableArrayList(system.getAllFlights())); 
 
-        // 初始排序
+        // Initial Sort
         colDate.setSortType(TableColumn.SortType.ASCENDING);
         colDepTime.setSortType(TableColumn.SortType.ASCENDING);
         colDest.setSortType(TableColumn.SortType.ASCENDING);
         colNo.setSortType(TableColumn.SortType.ASCENDING);
         statusTable.getSortOrder().addAll(colDate, colDepTime, colDest, colNo);
 
-        // 按钮点击事件
+        // Sort Event
         btnSort.setOnAction(e -> {
             statusTable.getSortOrder().clear(); 
             if (btnSort.getText().contains("Ascending")) {
@@ -542,11 +543,10 @@ public class App extends Application {
         });
 
         applyTableClip(statusTable); 
-        // 注意顺序：Header -> Stats -> TableHeader(含按钮) -> Table
         centerContent.getChildren().addAll(header, statsBox, tableHeaderBox, statusTable); 
     }
     
-    // ================== 2. 飞机管理视图 (UI 升级版 + 排期查看功能) ==================
+    // ================== 2. Aircraft Management View ==================
     private void showAircraftView() {
         centerContent.getChildren().clear();
         
@@ -567,7 +567,7 @@ public class App extends Application {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         VBox.setVgrow(table, Priority.ALWAYS);
 
-        // --- 原有列定义 ---
+        // --- Column Definitions ---
         TableColumn<Aircraft, String> colReg = new TableColumn<>("Reg No.");
         colReg.setCellValueFactory(new PropertyValueFactory<>("registrationNumber"));
         setupColumnFilter(colReg, "Reg No.", filteredData, masterData, activeFilters, Aircraft::getRegistrationNumber);
@@ -592,8 +592,7 @@ public class App extends Application {
                 super.updateItem(item, empty);
                 if (item != null && !empty) {
                     
-                    // [修改] 统一显示逻辑：
-                    // 如果状态是 "In Flight" 或 "Departed"，在界面上统一显示为 "Scheduled"
+                    // Unified display: "In Flight" / "Departed" -> Show as "Scheduled" on UI
                     String displayStatus = item;
                     if ("In Flight".equalsIgnoreCase(item) || "Departed".equalsIgnoreCase(item)) {
                         displayStatus = "Scheduled";
@@ -601,7 +600,6 @@ public class App extends Application {
                     
                     setText(displayStatus);
 
-                    // 颜色逻辑：Available 绿色，其他（Scheduled/In Flight等）一律蓝色
                     if ("Available".equalsIgnoreCase(item)) 
                         setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold; -fx-alignment: CENTER;");
                     else 
@@ -612,31 +610,28 @@ public class App extends Application {
         });
         setupColumnFilter(colStatus, "Status", filteredData, masterData, activeFilters, Aircraft::getStatus);
 
-        // --- [新增] Schedule 查看列 ---
+        // --- Schedule View Column ---
         TableColumn<Aircraft, Aircraft> colSchedule = new TableColumn<>("Schedule");
-        // 使用 Aircraft 对象本身作为这一列的数据
         colSchedule.setCellValueFactory(cell -> new javafx.beans.property.SimpleObjectProperty<>(cell.getValue()));
         
         colSchedule.setCellFactory(col -> new TableCell<Aircraft, Aircraft>() {
             private final Button btn = new Button("View");
 
             {
-                // 设置按钮样式 (紫色，区别于其他按钮)
                 btn.getStyleClass().add("btn");
                 btn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 4 12; -fx-background-radius: 15;");
                 
-                // 按钮点击事件：查找该飞机的排期
                 btn.setOnAction(e -> {
                     Aircraft a = getItem();
                     if (a != null) {
-                        // 1. 筛选出这架飞机 且 未结束 的航班 (Scheduled, Boarding, Departed...)
+                        // Filter for active flights for this aircraft
                         List<Flight> plans = system.getAllFlights().stream()
                             .filter(f -> f.getAircraft().getRegistrationNumber().equals(a.getRegistrationNumber()))
                             .filter(f -> !"Arrived".equalsIgnoreCase(f.getStatus()) && !"Cancelled".equalsIgnoreCase(f.getStatus()))
-                            .sorted((f1, f2) -> f1.getDepartureTime().compareTo(f2.getDepartureTime())) // 按时间排序
+                            .sorted((f1, f2) -> f1.getDepartureTime().compareTo(f2.getDepartureTime())) 
                             .collect(java.util.stream.Collectors.toList());
                         
-                        // 2. 构建显示内容
+                        // Build Content
                         if (plans.isEmpty()) {
                             showAlert("Schedule Info", "Aircraft " + a.getRegistrationNumber() + " is currently free (No future flights).");
                         } else {
@@ -651,7 +646,6 @@ public class App extends Application {
                                   .append("  [").append(f.getStatus()).append("]\n")
                                   .append("------------------------------------------------\n");
                             }
-                            // 弹窗显示
                             TextArea textArea = new TextArea(sb.toString());
                             textArea.setEditable(false);
                             textArea.setWrapText(true);
@@ -680,7 +674,7 @@ public class App extends Application {
             }
         });
         
-        // 设置列宽
+        // Column Widths
         colReg.setMinWidth(100);
         colBrand.setMinWidth(100);
         colModel.setMinWidth(100);
@@ -688,10 +682,9 @@ public class App extends Application {
         colStatus.setMinWidth(100);
         colSchedule.setMinWidth(100); colSchedule.setMaxWidth(120);
 
-        // 将所有列加入表格
         table.getColumns().addAll(colReg, colBrand, colModel, colCap, colStatus, colSchedule);
 
-        // --- 底部按钮 ---
+        // --- Actions ---
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_RIGHT);
         actions.setPadding(new Insets(15, 0, 0, 0));
@@ -718,7 +711,7 @@ public class App extends Application {
         centerContent.getChildren().addAll(header, table, actions);
     }
 
-    // ================== 3. 航班管理视图 (修复排序 + 固定排版) ==================
+    // ================== 3. Flight Management View ==================
     private void showFlightView() {
         centerContent.getChildren().clear();
         
@@ -730,7 +723,7 @@ public class App extends Application {
         FilteredList<Flight> filteredData = new FilteredList<>(masterData, p -> true);
         Map<String, java.util.function.Predicate<Flight>> activeFilters = new java.util.HashMap<>();
 
-        // 1. 绑定排序比较器 (这是排序生效的基础)
+        // Bind Comparator for Sorting
         SortedList<Flight> sortedData = new SortedList<>(filteredData);
         TableView<Flight> table = new TableView<>();
         sortedData.comparatorProperty().bind(table.comparatorProperty());
@@ -739,7 +732,7 @@ public class App extends Application {
         table.getStyleClass().add("live-board");
         VBox.setVgrow(table, Priority.ALWAYS);
 
-// --- 列定义 ---
+        // --- Column Definitions ---
         
         // 1. Flight No
         TableColumn<Flight, String> colNo = new TableColumn<>();
@@ -768,11 +761,9 @@ public class App extends Application {
         colDate.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getDepartureTime().toLocalDate().toString()));
         setupColumnFilter(colDate, "Date", filteredData, masterData, activeFilters, f -> f.getDepartureTime().toLocalDate().toString());
 
-        // [修改] 5. Aircraft (替换掉了原来的 Origin)
+        // 5. Aircraft
         TableColumn<Flight, String> colAircraft = new TableColumn<>();
-        // 获取飞机的注册号 (e.g., 9M-MRO)
         colAircraft.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getAircraft().getRegistrationNumber()));
-        // 添加 Filter 逻辑
         setupColumnFilter(colAircraft, "Aircraft", filteredData, masterData, activeFilters, f -> f.getAircraft().getRegistrationNumber());
 
         // 6. Destination
@@ -829,27 +820,20 @@ public class App extends Application {
         });
         setupColumnFilter(colStatus, "Status", filteredData, masterData, activeFilters, Flight::getStatus);
 
-        // ---------------------------------------------------------
-        // [关键修改] 更新列添加顺序 (移除了 colOrigin，加入了 colAircraft)
-        // ---------------------------------------------------------
+        // Update column order
         table.getColumns().addAll(colNo, colType, colLoad, colDate, colAircraft, colDest, colDepTime, colArrTime, colStatus);
 
-        // [排序修复] 保持不变
+        // Default Sort
         colDate.setSortType(TableColumn.SortType.ASCENDING);
         colDepTime.setSortType(TableColumn.SortType.ASCENDING);
         table.getSortOrder().addAll(colDate, colDepTime); 
 
-        // ---------------------------------------------------------
-        // [关键修改] 更新列宽绑定 (colAircraft 继承了原 Origin 的宽度位置)
-        // ---------------------------------------------------------
+        // Bind Column Widths
         colNo.prefWidthProperty().bind(table.widthProperty().multiply(0.10));      
         colType.prefWidthProperty().bind(table.widthProperty().multiply(0.08));    
         colLoad.prefWidthProperty().bind(table.widthProperty().multiply(0.11));    
         colDate.prefWidthProperty().bind(table.widthProperty().multiply(0.10));    
-        
-        // 原本是 colOrigin (0.09)，现在改为 colAircraft
         colAircraft.prefWidthProperty().bind(table.widthProperty().multiply(0.09));  
-        
         colDest.prefWidthProperty().bind(table.widthProperty().multiply(0.13));    
         colDepTime.prefWidthProperty().bind(table.widthProperty().multiply(0.15)); 
         colArrTime.prefWidthProperty().bind(table.widthProperty().multiply(0.14)); 
@@ -892,41 +876,35 @@ public class App extends Application {
         centerContent.getChildren().addAll(header, table, actions);
     }
     
-    // =================================================
-    // 4. Reports & Logs View (Compact Layout)
-    // =================================================
+    // ================== 4. Reports & Analytics View ==================
     private void showReportsView() {
         centerContent.getChildren().clear();
 
-        // [核心优化] 创建一个独立的紧凑容器，间距设为 5 (原本是 20，太宽了)
+        // Use compact container
         VBox reportContainer = new VBox(5);
         
-        // 1. 页面大标题
+        // Header
         Label header = new Label("Reports & Analytics");
         header.getStyleClass().add("content-header");
-        // 这里的下边距设为 0，让下面的内容紧贴标题
         header.setPadding(new Insets(0, 0, 0, 0)); 
 
-        // 2. 内容区域
+        // Content Area
         StackPane contentArea = new StackPane();
         VBox.setVgrow(contentArea, Priority.ALWAYS);
         
-        // 默认显示运营统计
+        // Show default view
         contentArea.getChildren().add(createAnalysisTables(contentArea));
         
-        // 将标题和内容放入紧凑容器
         reportContainer.getChildren().addAll(header, contentArea);
-
-        // 最后把这个紧凑容器放入主区域
         centerContent.getChildren().add(reportContainer);
     }
 
-    // 创建统计表格 (修复版：内容居中 + Total行样式)
+    // Create Stats Tables
     private Node createAnalysisTables(StackPane parentContainer) {
         HBox container = new HBox(15);
         container.setPadding(new Insets(0)); 
         
-        // --- 1. 准备右侧的导航按钮 ---
+        // Navigation Button
         Button btnToHistory = new Button("Flight History");
         btnToHistory.getStyleClass().addAll("btn", "btn-primary");
         btnToHistory.setOnAction(e -> {
@@ -938,28 +916,28 @@ public class App extends Application {
         rightNavRow.setAlignment(Pos.CENTER_RIGHT); 
         rightNavRow.setPadding(new Insets(0, 0, 2, 0)); 
 
-        // --- 2. 准备左侧的占位符 ---
+        // Spacer
         Region leftSpacer = new Region();
         leftSpacer.prefHeightProperty().bind(rightNavRow.heightProperty());
         leftSpacer.minHeightProperty().bind(rightNavRow.heightProperty());
 
-        // --- 3. 左侧表格 (Status) ---
+        // --- Left Table (Status) ---
         TableView<StatRow> statsTable = new TableView<>();
         statsTable.getStyleClass().add("live-board");
         statsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
-        // [修改] 列定义 + 设置居中
+        // Centered Columns
         TableColumn<StatRow, String> colCategory = new TableColumn<>("Category");
         colCategory.setCellValueFactory(new PropertyValueFactory<>("category"));
-        colCategory.setStyle("-fx-alignment: CENTER;"); // <--- 居中
+        colCategory.setStyle("-fx-alignment: CENTER;");
         
         TableColumn<StatRow, Integer> colCount = new TableColumn<>("Count");
         colCount.setCellValueFactory(new PropertyValueFactory<>("count"));
-        colCount.setStyle("-fx-alignment: CENTER;"); // <--- 居中
+        colCount.setStyle("-fx-alignment: CENTER;");
         
         statsTable.getColumns().addAll(colCategory, colCount);
         
-        // 填充数据
+        // Populate Data
         int scheduled = 0, active = 0, completed = 0, delayed = 0, cancelled = 0;
         for (Flight f : system.getAllFlights()) {
             String s = f.getStatus();
@@ -979,7 +957,7 @@ public class App extends Application {
             new StatRow("TOTAL FLIGHTS", system.getAllFlights().size())
         ));
 
-        // 绑定高度 (去除空行)
+        // Bind Height
         statsTable.setFixedCellSize(30); 
         statsTable.prefHeightProperty().bind(
             Bindings.size(statsTable.getItems())
@@ -989,7 +967,7 @@ public class App extends Application {
         statsTable.minHeightProperty().bind(statsTable.prefHeightProperty());
         statsTable.maxHeightProperty().bind(statsTable.prefHeightProperty());
 
-        // Total 行特殊样式
+        // Style Total Row
         statsTable.setRowFactory(tv -> new TableRow<StatRow>() {
             @Override
             protected void updateItem(StatRow item, boolean empty) {
@@ -1004,27 +982,26 @@ public class App extends Application {
         
         applyTableClip(statsTable);
 
-        // --- 4. 右侧表格 (Delay) ---
+        // --- Right Table (Delay) ---
         TableView<DelayRow> delayTable = new TableView<>();
         delayTable.getStyleClass().add("live-board");
         delayTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
-        // [修改] 列定义 + 设置居中
         TableColumn<DelayRow, String> colFlight = new TableColumn<>("Flight No");
         colFlight.setCellValueFactory(new PropertyValueFactory<>("flightNo"));
-        colFlight.setStyle("-fx-alignment: CENTER;"); // <--- 居中
+        colFlight.setStyle("-fx-alignment: CENTER;");
 
         TableColumn<DelayRow, String> colDate = new TableColumn<>("Date");
         colDate.setCellValueFactory(new PropertyValueFactory<>("date"));
-        colDate.setStyle("-fx-alignment: CENTER;"); // <--- 居中
+        colDate.setStyle("-fx-alignment: CENTER;");
 
         TableColumn<DelayRow, String> colDelayCat = new TableColumn<>("Category");
         colDelayCat.setCellValueFactory(new PropertyValueFactory<>("category"));
-        colDelayCat.setStyle("-fx-alignment: CENTER;"); // <--- 居中
+        colDelayCat.setStyle("-fx-alignment: CENTER;");
 
         TableColumn<DelayRow, String> colReason = new TableColumn<>("Details");
         colReason.setCellValueFactory(new PropertyValueFactory<>("reason"));
-        colReason.setStyle("-fx-alignment: CENTER-LEFT;"); // <--- 长文本保持靠左更好读
+        colReason.setStyle("-fx-alignment: CENTER-LEFT;");
 
         delayTable.getColumns().addAll(colFlight, colDate, colDelayCat, colReason);
         
@@ -1044,7 +1021,7 @@ public class App extends Application {
         delayTable.setPlaceholder(new Label("No delays reported."));
         applyTableClip(delayTable);
 
-        // --- 5. 组装布局 ---
+        // --- Layout ---
         Label lblStatus = new Label("Status Overview");
         lblStatus.setStyle("-fx-font-weight: bold; -fx-text-fill: #2c3e50;");
         
@@ -1066,12 +1043,12 @@ public class App extends Application {
         return container;
     }
 
-    // 创建历史记录表格 (优化版：按钮列紧凑，其他列自动填充)
+    // Create History Table
     private Node createHistoryTable(StackPane parentContainer) {
         VBox mainBox = new VBox(2);
         mainBox.setPadding(new Insets(0)); 
 
-        // 1. 顶部导航行
+        // Top Navigation
         HBox navRow = new HBox();
         navRow.setAlignment(Pos.CENTER_RIGHT);
         navRow.setPadding(new Insets(0, 0, 2, 0)); 
@@ -1084,12 +1061,12 @@ public class App extends Application {
         });
         navRow.getChildren().add(btnBack);
 
-        // 2. 标题
+        // Title
         Label lblTitle = new Label("Flight History (Arrived)");
         lblTitle.setFont(Font.font("Arial", FontWeight.BOLD, 14));
         lblTitle.setTextFill(javafx.scene.paint.Color.web("#2c3e50"));
 
-        // 3. 表格
+        // Table
         TableView<Flight> historyTable = new TableView<>();
         historyTable.getStyleClass().add("live-board");
         historyTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY); 
@@ -1100,7 +1077,7 @@ public class App extends Application {
         }
         historyTable.setItems(arrivedFlights);
 
-        // --- 列定义 ---
+        // --- Column Definitions ---
         
         TableColumn<Flight, String> colNo = new TableColumn<>("Flight No");
         colNo.setCellValueFactory(new PropertyValueFactory<>("flightNumber"));
@@ -1131,12 +1108,12 @@ public class App extends Application {
             new javafx.beans.property.SimpleObjectProperty<>(cell.getValue().getDelayReasons().size()));
         colDelayCount.setStyle("-fx-alignment: CENTER;");
 
-        // --- Delay Remarks (按钮列) ---
-        TableColumn<Flight, Flight> colDetails = new TableColumn<>("Remarks"); // 标题改短一点
+        // --- Delay Remarks (Button) ---
+        TableColumn<Flight, Flight> colDetails = new TableColumn<>("Remarks"); 
         colDetails.setCellValueFactory(cell -> new javafx.beans.property.SimpleObjectProperty<>(cell.getValue()));
         
         colDetails.setCellFactory(col -> new TableCell<Flight, Flight>() {
-            private final Button btn = new Button("View"); // 按钮文字改短一点
+            private final Button btn = new Button("View"); 
 
             {
             	btn.getStyleClass().add("btn");
@@ -1183,17 +1160,14 @@ public class App extends Application {
             }
         });
 
-        // [核心修改]: 调整列宽策略
-        // 1. 给数据列设置最小宽度，但不设置最大宽度 (setMaxWidth)，让它们可以自动拉伸填满屏幕
+        // Column Width Strategy
         colNo.setMinWidth(80); 
         colDate.setMinWidth(100); 
         colPlane.setMinWidth(100); 
         colArrTime.setMinWidth(100); 
         colDelayCount.setMinWidth(60); 
-
-        // 2. 给按钮列设置固定范围，防止它占满剩余空间
         colDetails.setMinWidth(80); 
-        colDetails.setMaxWidth(150); // 锁死宽度，只够放一个小按钮即可
+        colDetails.setMaxWidth(150); 
 
         historyTable.getColumns().addAll(colNo, colDate, colPlane, colArrTime, colDelayCount, colDetails);
         historyTable.setPlaceholder(new Label("No flight history available."));
@@ -1203,9 +1177,10 @@ public class App extends Application {
         mainBox.getChildren().addAll(navRow, lblTitle, historyTable);
         return mainBox;
     }
-    // ================== 5. 弹窗 Dialogs (添加/修改/输入) ==================
+    
+    // ================== 5. Dialogs (Add/Update/Input) ==================
 
-    // 弹出添加飞机对话框 (包含 Model 格式验证)
+    // Add Aircraft Dialog
     private void showAddAircraftDialog() {
         Dialog<Aircraft> dialog = new Dialog<>();
         dialog.setTitle("Add New Aircraft");
@@ -1222,7 +1197,6 @@ public class App extends Application {
         TextField brandField = new TextField();
         brandField.setPromptText("e.g. Boeing");
 
-        // [修改 1] 设置 Model 的提示格式
         TextField modelField = new TextField();
         modelField.setPromptText("e.g. B737-800");
 
@@ -1235,11 +1209,10 @@ public class App extends Application {
         grid.add(new Label("Capacity:"), 0, 3); grid.add(capField, 1, 3);
         dialog.getDialogPane().setContent(grid);
 
-        // 验证输入
+        // Validation
         Button addBtn = (Button) dialog.getDialogPane().lookupButton(addBtnType);
         addBtn.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
             try {
-                // 1. 验证 Reg No
                 if (regField.getText().trim().isEmpty()) {
                     showAlert("Validation Error", "Registration Number cannot be empty.");
                     event.consume(); return;
@@ -1249,14 +1222,11 @@ public class App extends Application {
                     event.consume(); return;
                 }
                 
-                // 2. 验证 Brand
                 else if (brandField.getText().trim().isEmpty()) {
                     showAlert("Validation Error", "Brand cannot be empty.");
                     event.consume(); return;
                 }
                 
-                // [修改 2] 验证 Model 格式
-                // 规则：只允许大写字母、数字和横杠 (例如 B737, A320-200)
                 else if (modelField.getText().trim().isEmpty()) {
                     showAlert("Validation Error", "Model cannot be empty.");
                     event.consume(); return;
@@ -1268,7 +1238,6 @@ public class App extends Application {
                     event.consume(); return;
                 }
 
-                // 3. 验证 Capacity
                 Integer.parseInt(capField.getText()); 
 
             } catch (NumberFormatException ex) {
@@ -1277,7 +1246,6 @@ public class App extends Application {
             }
         });
 
-        // 转换结果
         dialog.setResultConverter(btn -> {
             if (btn == addBtnType) {
                 return new Aircraft(
@@ -1294,7 +1262,7 @@ public class App extends Application {
         dialog.showAndWait().ifPresent(a -> system.addAircraft(a)); 
     }
 
-    // 弹出添加航班对话框 (包含时间校验：禁止选择过去的时间)
+    // Add Flight Dialog
     private void showAddFlightDialog() {
         Dialog<Flight> dialog = new Dialog<>();
         dialog.setTitle("Add New Flight");
@@ -1316,9 +1284,9 @@ public class App extends Application {
         TextField paxField = new TextField();
         paxField.setPromptText("Passengers");
         
-        // [修改 1] 日期选择器初始化
+        // DatePicker initialization
         DatePicker datePicker = new DatePicker(LocalDate.now()); 
-        // 禁止选择过去的日期 (将昨天及之前的日期设为不可用)
+        // Disable past dates
         datePicker.setDayCellFactory(picker -> new DateCell() {
             @Override
             public void updateItem(LocalDate date, boolean empty) {
@@ -1329,7 +1297,6 @@ public class App extends Application {
 
         ComboBox<String> hourBox = new ComboBox<>(); 
         for(int i=0; i<24; i++) hourBox.getItems().add(String.format("%02d", i));
-        // 默认选当前小时的下一个小时，体验更好
         hourBox.setValue(String.format("%02d", LocalTime.now().plusHours(1).getHour()));
 
         ComboBox<String> minBox = new ComboBox<>(); 
@@ -1367,7 +1334,7 @@ public class App extends Application {
 
         Button createBtn = (Button) dialog.getDialogPane().lookupButton(createBtnType);
         createBtn.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-            // --- 1. 基础验证 ---
+            // --- 1. Basic Validation ---
             String fNumInput = flightNoField.getText().trim();
             String destInput = destField.getText().trim();
 
@@ -1398,14 +1365,13 @@ public class App extends Application {
                 event.consume(); return;
             }
 
-            // --- 2. [核心修改] 验证时间是否为过去的时间 ---
+            // --- 2. Time Validation (No past times) ---
             try {
                 LocalDate selectedDate = datePicker.getValue();
                 int h = Integer.parseInt(hourBox.getValue());
                 int m = Integer.parseInt(minBox.getValue());
                 LocalDateTime selectedDateTime = LocalDateTime.of(selectedDate, LocalTime.of(h, m));
                 
-                // 如果选中的时间 早于(isBefore) 当前时间
                 if (selectedDateTime.isBefore(LocalDateTime.now())) {
                     showAlert("Invalid Time", 
                         "Cannot schedule a flight in the past!\n" +
@@ -1420,7 +1386,7 @@ public class App extends Application {
                 event.consume(); return;
             }
 
-            // --- 3. 验证乘客/货物 ---
+            // --- 3. Capacity Validation ---
             try {
                 if (cargoCheckbox.isSelected()) {
                     Double.parseDouble(cargoWeightField.getText());
@@ -1447,7 +1413,7 @@ public class App extends Application {
                 event.consume(); return;
             }
 
-            // --- 4. 验证飞机档期冲突 ---
+            // --- 4. Conflict Validation ---
             try {
                 LocalDateTime dep = LocalDateTime.of(datePicker.getValue(), 
                         LocalTime.of(Integer.parseInt(hourBox.getValue()), Integer.parseInt(minBox.getValue())));
@@ -1467,7 +1433,6 @@ public class App extends Application {
             }
         });
 
-        // 结果转换
         dialog.setResultConverter(btn -> {
             if (btn == createBtnType) {
                 String reg = aircraftBox.getValue();
@@ -1495,26 +1460,24 @@ public class App extends Application {
         });
     }
     
- // [检查方法] 确保同一架飞机的上一班航班已经“抵达”或“取消”
+    // Check if previous flight for this aircraft is completed
     private boolean isPreviousFlightCompleted(Flight currentFlight) {
         for (Flight f : system.getAllFlights()) {
-            // 1. 找到同一架飞机的其他航班 (排除自己)
             if (f != currentFlight && 
                 f.getAircraft().getRegistrationNumber().equals(currentFlight.getAircraft().getRegistrationNumber())) {
                 
-                // 2. 检查 f 是否是比当前航班“更早”的航班
+                // Check if f is an earlier flight
                 if (f.getDepartureTime().isBefore(currentFlight.getDepartureTime())) {
                     
-                    // 3. 检查状态：如果更早的航班既没抵达(Arrived)，也没取消(Cancelled)
-                    // 意味着它还在排队(Scheduled)或者还在飞(Departed)，那现在的航班就不能动。
+                    // If earlier flight is not Arrived or Cancelled, it blocks the current one
                     String s = f.getStatus();
                     if (!"Arrived".equalsIgnoreCase(s) && !"Cancelled".equalsIgnoreCase(s)) {
-                        return false; // 拦截：上一班还没完事
+                        return false; 
                     }
                 }
             }
         }
-        return true; // 通过：所有前序航班都搞定了
+        return true; 
     }
     
     private void showUpdateStatusDialog(Flight flight) {
@@ -1528,23 +1491,22 @@ public class App extends Application {
         dialog.showAndWait().ifPresent(newStatus -> {
             try {
                 // ============================================================
-                // [新增核心逻辑] 顺序校验
-                // 如果操作不是“取消”，则必须确保上一班机已完成任务
+                // Core Logic: Sequence Validation
+                // Block operation if previous flight isn't finished (unless cancelling)
                 // ============================================================
                 if (!"Cancelled".equalsIgnoreCase(newStatus)) {
                      if (!isPreviousFlightCompleted(flight)) {
-                         // 弹窗警告
                          showAlert("Sequence Error", 
                              "Operation Blocked!\n\n" + 
                              "Aircraft " + flight.getAircraft().getRegistrationNumber() + 
                              " has a previous flight that is not yet Arrived or Cancelled.\n" +
                              "Please complete previous flights first.");
-                         return; // 这里的 return 非常重要，直接终止后续代码执行
+                         return; 
                      }
                 }
                 // ============================================================
 
-                // --- 1. 尝试起飞 ---
+                // --- 1. Departure ---
                 if ("Departed".equals(newStatus)) {
                     if ("Departed".equals(flight.getStatus())) return; 
                     
@@ -1552,13 +1514,13 @@ public class App extends Application {
                     showAlert("Success", "Flight Departed.");
                     showFlightView(); 
 
-                // --- 2. 尝试到达 ---
+                // --- 2. Arrival ---
                 } else if ("Arrived".equals(newStatus)) {
                     system.attemptArrival(flight);
                     showAlert("Success", "Flight Arrived.");
                     showFlightView();
 
-                // --- 3. 手动延误 ---
+                // --- 3. Manual Delay ---
                 } else if ("Delayed".equals(newStatus)) {
                     showDelayReasonDialog(flight, (reason) -> {
                          system.manualDelay(flight, reason);
@@ -1566,13 +1528,14 @@ public class App extends Application {
                          showFlightView(); 
                     });
 
-                // --- 4. 其他状态 (Boarding, Cancelled 等) ---
-                } else {
+                // --- 4. Other Statuses ---
+                }  else {
                     system.updateFlightStatus(flight.getFlightNumber(), newStatus);
                     
                     // 如果取消了，释放飞机资源，并刷新排期
                     if ("Cancelled".equals(newStatus)) {
-                        flight.getAircraft().setStatus("Available");
+                        system.autoUpdateAircraftStatus(flight.getAircraft().getRegistrationNumber());
+                        
                         system.refreshScheduleForAircraft(flight.getAircraft().getRegistrationNumber());
                     }
                     showFlightView();
@@ -1584,7 +1547,7 @@ public class App extends Application {
         });
     }
 
-    // 替换 App.java 中的 showDelayReasonDialog 方法
+    // Delay Reason Dialog
     private void showDelayReasonDialog(Flight flight, java.util.function.Consumer<String> onConfirm) {
         Dialog<String> delayDialog = new Dialog<>();
         delayDialog.setTitle("Delay Details");
@@ -1592,33 +1555,32 @@ public class App extends Application {
         ButtonType okBtn = new ButtonType("Confirm", ButtonBar.ButtonData.OK_DONE);
         delayDialog.getDialogPane().getButtonTypes().addAll(okBtn, ButtonType.CANCEL);
 
+        // Data Setup
         Map<String, List<String>> delayMap = new LinkedHashMap<>(); 
         delayMap.put("Weather Conditions", Arrays.asList("Heavy Rain", "Thunderstorm", "Fog"));
         delayMap.put("Technical", Arrays.asList("Engine Issue", "Hydraulic Issue", "Door Sensor"));
         delayMap.put("Operational", Arrays.asList("Late Incoming Aircraft", "Crew Timeout", "Cleaning"));
         delayMap.put("Others", new ArrayList<>()); 
 
+        // Layout Setup
         GridPane grid = new GridPane();
         grid.setHgap(10); grid.setVgap(10); 
-        
-        // [修改 1] 这里的 Padding 原本是 (20, 150, 10, 10)，现在改小为 (20, 20, 10, 10)
         grid.setPadding(new Insets(20, 20, 10, 10)); 
 
         ComboBox<String> categoryBox = new ComboBox<>();
         categoryBox.getItems().addAll(delayMap.keySet());
         categoryBox.setPromptText("Category");
-        // [修改 2] 限制宽度，防止太宽
         categoryBox.setPrefWidth(200); 
 
         ComboBox<String> reasonBox = new ComboBox<>();
         reasonBox.setPromptText("Reason");
         reasonBox.setVisible(false);
-        reasonBox.setPrefWidth(200); // 限制宽度
+        reasonBox.setPrefWidth(200); 
 
         TextArea otherField = new TextArea();
         otherField.setVisible(false); 
-        otherField.setPrefHeight(60); // 高度稍微给够一点点
-        otherField.setPrefWidth(200); // 限制宽度
+        otherField.setPrefHeight(60); 
+        otherField.setPrefWidth(200); 
 
         grid.add(new Label("Category:"), 0, 0); grid.add(categoryBox, 1, 0);
         grid.add(new Label("Reason:"), 0, 1);
@@ -1626,16 +1588,45 @@ public class App extends Application {
         container.setAlignment(Pos.CENTER_LEFT);
         grid.add(container, 1, 1);
 
-        delayDialog.getDialogPane().setContent(grid);
+        // Important: Add content to the dialog pane, otherwise it will be empty!
+        delayDialog.getDialogPane().setContent(grid); 
 
-        // 逻辑部分保持不变
+        // Logic: Show/Hide based on selection
         categoryBox.setOnAction(e -> {
             String cat = categoryBox.getValue();
             if ("Others".equals(cat)) {
                 reasonBox.setVisible(false); otherField.setVisible(true);
             } else {
                 otherField.setVisible(false); reasonBox.setVisible(true);
-                reasonBox.getItems().setAll(delayMap.get(cat));
+                if (cat != null) {
+                    reasonBox.getItems().setAll(delayMap.get(cat));
+                    reasonBox.setValue(null); // Reset reason when category changes
+                }
+            }
+        });
+
+        Button confirmBtn = (Button) delayDialog.getDialogPane().lookupButton(okBtn);
+        confirmBtn.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            String selectedCat = categoryBox.getValue();
+            
+            // 1. Check if a Category is selected
+            if (selectedCat == null) {
+                showAlert("Validation Error", "Please select a delay category first.");
+                event.consume(); // Prevent dialog from closing
+                return;
+            }
+
+            // 2. Check if a Reason is selected (or typed if 'Others')
+            if ("Others".equals(selectedCat)) {
+                if (otherField.getText().trim().isEmpty()) {
+                    showAlert("Validation Error", "Please type a reason description.");
+                    event.consume(); // Prevent dialog from closing
+                }
+            } else {
+                if (reasonBox.getValue() == null) {
+                    showAlert("Validation Error", "Please select a specific reason from the list.");
+                    event.consume(); // Prevent dialog from closing
+                }
             }
         });
 
@@ -1650,19 +1641,19 @@ public class App extends Application {
 
         delayDialog.showAndWait().ifPresent(reason -> {
             if (reason != null && !reason.isEmpty()) {
-                onConfirm.accept(reason); // 回调
+                onConfirm.accept(reason); 
             }
         });
     }
 
-    // 辅助方法：显示简单弹窗
+    // Helper: Show simple alert
     private void showAlert(String title, String content) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(title); alert.setContentText(content);
         alert.showAndWait();
     }
     
-    // 辅助方法：创建卡片 UI
+    // Helper: Create card UI
     private VBox createStatCard(String title, String value) {
         VBox card = new VBox(5);
         card.getStyleClass().add("card");
@@ -1674,7 +1665,7 @@ public class App extends Application {
         return card;
     }
     
-    // 辅助方法：给表格加圆角剪裁
+    // Helper: Apply rounded clip to table
     private void applyTableClip(Region region) {
         Rectangle clip = new Rectangle();
         clip.setArcWidth(30); clip.setArcHeight(30);
@@ -1685,7 +1676,7 @@ public class App extends Application {
 
     public static void main(String[] args) { launch(); }
 
-    // --- 内部辅助类 ---
+    // --- Inner Helper Classes ---
     public static class StatRow {
         private final String category;
         private final int count;

@@ -12,7 +12,7 @@ public class Flight implements Serializable {
     private String origin;
     private String destination;
     
-    // 这些时间会随着 Delay 而变动 (9:00 -> 10:00)
+    // Timestamps (subject to change due to delays)
     private LocalDateTime departureTime; 
     private LocalDateTime arrivalTime;   
     
@@ -35,14 +35,14 @@ public class Flight implements Serializable {
         this.status = "Scheduled"; 
     }
 
-    // [手动延误]: 每次调用，时间自动 +1 小时
+    // Manual delay: adds 1 hour
     public void addDelayReason(String reason) {
         this.delayReasons.add(reason);
         this.departureTime = this.departureTime.plusHours(1); 
         this.arrivalTime = this.arrivalTime.plusHours(1);     
     }
     
-    // [系统自动延误]: 用于传播延误，精确到分钟
+    // System propagation delay: adds specific minutes
     public void addPropagatedDelay(String reason, long minutes) {
         this.delayReasons.add(reason);
         this.departureTime = this.departureTime.plusMinutes(minutes);
